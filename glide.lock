@@ -1,6 +1,16 @@
-hash: 70958772c6e61c4bebde0348ebfc0e2b4f564469c8f531264cb807523da573b5
-updated: 2018-05-21T19:43:54.991065+08:00
+hash: 8755337e318238b75980f48b7eb8d4c20209a16d982542bf7ee847a00dcd6594
+updated: 2018-05-23T17:21:57.923883+08:00
 imports:
+- name: github.com/google/go-querystring
+  version: 53e6ce116135b80d037921a7fdd5138cf32d7a8a
+  subpackages:
+  - query
+- name: github.com/mozillazg/go-cos
+  version: 500ad7dd4bb47eec34b73e8ffd8f4871bb0dfb30
+  subpackages:
+  - debug
+- name: github.com/mozillazg/go-httpheader
+  version: fcf1e196bc6f884f5e97d5084c83feb917e15b08
 - name: github.com/qiniu/api.v7
   version: 0c661d0ca96771709f67b3d9eac10f27033b1f2a
 testImports: []

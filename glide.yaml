@@ -2,3 +2,5 @@ package: github.com/TechCatsLab/apix
 import:
 - package: github.com/qiniu/api.v7
   version: ^7.2.3
+- package: github.com/mozillazg/go-cos
+  version: ^0.7.0
