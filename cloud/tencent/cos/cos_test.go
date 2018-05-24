@@ -42,15 +42,13 @@ func TestService(t *testing.T) {
 				for _, object := range objects {
 					if object.Size > 0 {
 						wg.Add(1)
-						path, filename := filepath.Split(object.Key)
-						CheckPath("files/" + path)
-						go func(objectKey, path, filename string) {
-							err = Download(client, objectKey, path, filename)
-							if err != nil {
+						go func(objectKey string) {
+							path, filename := filepath.Split(objectKey)
+							if err = Download(client, objectKey, "files/"+path, filename); err != nil {
 								t.Error(err)
 							}
 							wg.Done()
-						}(object.Key, "files/"+path, filename)
+						}(object.Key)
 					}
 				}
 				wg.Wait()

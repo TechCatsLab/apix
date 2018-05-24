@@ -19,29 +19,27 @@ import (
 	"github.com/pkg/errors"
 )
 
-/*
-* 配置
-* "AppID" 可选
-* "SecretID" 必须有，到 https://console.cloud.tencent.com/cam/capi 获取
-* "SecretKey" 必须有，可以设置关联策略限制权限: https://console.cloud.tencent.com/cam/policy
-* "Region" 可选
- */
+// Config for client
+// "AppID" optional
+// "SecretID" mandatory, get from https://console.cloud.tencent.com/cam/capi
+// "SecretKey" mandatory, setting policy for permission in https://console.cloud.tencent.com/cam/policy
+// "Region" optional
 type Config map[string]string
 
+// InitClient for get service
 type InitClient struct {
 	Config
 	Client *cos.Client
 }
 
+// BucketClient for bucket operation
 type BucketClient struct {
 	Client *cos.Client
 }
 
 const isDebug = false // 是否输出请求日志
 
-/*
-* 初始化配置
- */
+// Init for get client config
 func (ic *InitClient) Init(config Config) error {
 	if id, ok := config["SecretID"]; !ok || id == "" {
 		return errors.New("not valid secretid")
@@ -67,7 +65,7 @@ func (ic *InitClient) Init(config Config) error {
 	return nil
 }
 
-// GetService returns ?
+// GetService returns a service
 func (ic *InitClient) GetService() (*cos.ServiceGetResult, error) {
 	if ic.Client == nil {
 		return nil, errors.New("client with not Init")
@@ -83,9 +81,7 @@ func (ic *InitClient) GetService() (*cos.ServiceGetResult, error) {
 	return service, nil
 }
 
-/*
-* 获取用户所有桶信息
- */
+// GetBucketsList for get all buckets of user
 func (ic *InitClient) GetBucketsList() ([]cos.Bucket, error) {
 	service, err := ic.GetService()
 	if err != nil {
@@ -103,14 +99,12 @@ func (ic *InitClient) GetBucketsList() ([]cos.Bucket, error) {
 	return []cos.Bucket{}, errors.New("no bucket exits")
 }
 
-/*
-* 获取桶的 Client
- */
+// GetBucketClient for get a bucket operation client
 func (ic *InitClient) GetBucketClient(bucket cos.Bucket) *cos.Client {
-	bucketUrl, _ := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", bucket.Name, bucket.Region))
-	baseUrl := &cos.BaseURL{BucketURL: bucketUrl}
+	bucketURL, _ := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", bucket.Name, bucket.Region))
+	baseURL := &cos.BaseURL{BucketURL: bucketURL}
 
-	return cos.NewClient(baseUrl, &http.Client{
+	return cos.NewClient(baseURL, &http.Client{
 		Transport: &cos.AuthorizationTransport{
 			SecretID:  ic.Config["SecretID"],
 			SecretKey: ic.Config["SecretKey"],
@@ -124,9 +118,7 @@ func (ic *InitClient) GetBucketClient(bucket cos.Bucket) *cos.Client {
 	})
 }
 
-/*
-* 获取桶中对象列表
- */
+// GetObjectsList for get all objects in bucket
 func (ic *InitClient) GetObjectsList(bucket cos.Bucket) ([]cos.Object, error) {
 	client := ic.GetBucketClient(bucket)
 
@@ -146,9 +138,7 @@ func (ic *InitClient) GetObjectsList(bucket cos.Bucket) ([]cos.Object, error) {
 	return bucketInfo.Contents, nil
 }
 
-/*
-* 下载文件到本地
- */
+// Download files to local
 func Download(client *cos.Client, objectKey, path, filename string) error {
 	resp, err := client.Object.Get(context.Background(), objectKey, nil)
 	if err != nil {
@@ -165,6 +155,11 @@ func Download(client *cos.Client, objectKey, path, filename string) error {
 	}
 	defer resp.Body.Close()
 
+	if err = CheckPath(path); err != nil {
+		log.Fatal(err)
+
+		return err
+	}
 	//log.Println(resp.Request.URL, resp.ContentLength, len(data), "\n")
 	if err = ioutil.WriteFile(path+"/"+filename, data, 0666); err != nil {
 		log.Fatal("write file err: ", err)
@@ -175,9 +170,7 @@ func Download(client *cos.Client, objectKey, path, filename string) error {
 	return nil
 }
 
-/*
-* 检查目录是否存在
- */
+// CheckPath to create directory if the path doesn't exit
 func CheckPath(path string) error {
 	_, err := os.Stat(path)
 
