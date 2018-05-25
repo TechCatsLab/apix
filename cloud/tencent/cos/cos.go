@@ -24,11 +24,16 @@ import (
 // "SecretID" mandatory, get from https://console.cloud.tencent.com/cam/capi
 // "SecretKey" mandatory, setting policy for permission in https://console.cloud.tencent.com/cam/policy
 // "Region" optional
-type Config map[string]string
+type Config struct {
+	AppID     string // optional
+	SecretID  string // mandatory
+	SecretKey string // mandatory
+	Region    string // optional
+}
 
-// InitClient for get service
-type InitClient struct {
-	Config
+// AuthorizationClient for get service
+type AuthorizationClient struct {
+	*Config
 	Client *cos.Client
 }
 
@@ -39,20 +44,23 @@ type BucketClient struct {
 
 const isDebug = false // 是否输出请求日志
 
-// Init for get client config
-func (ic *InitClient) Init(config Config) error {
-	if id, ok := config["SecretID"]; !ok || id == "" {
-		return errors.New("not valid secretid")
+// CreateAuthorizationClient creates a client for authorization.
+func CreateAuthorizationClient(config Config) (*AuthorizationClient, error) {
+	if config.SecretID == "" {
+		return nil, errors.New("not valid secretid")
 	}
-	if k, ok := config["SecretKey"]; !ok || k == "" {
-		return errors.New("not valid secretkey")
+	if config.SecretKey == "" {
+		return nil, errors.New("not valid secretkey")
 	}
 
-	ic.Config = config
-	ic.Client = cos.NewClient(nil, &http.Client{
+	c := &AuthorizationClient{
+		Config: &config,
+	}
+
+	c.Client = cos.NewClient(nil, &http.Client{
 		Transport: &cos.AuthorizationTransport{
-			SecretID:  config["SecretID"],
-			SecretKey: config["SecretKey"],
+			SecretID:  config.SecretID,
+			SecretKey: config.SecretKey,
 			Transport: &debug.DebugRequestTransport{
 				RequestHeader:  isDebug,
 				RequestBody:    isDebug,
@@ -62,16 +70,16 @@ func (ic *InitClient) Init(config Config) error {
 		},
 	})
 
-	return nil
+	return c, nil
 }
 
 // GetService returns a service
-func (ic *InitClient) GetService() (*cos.ServiceGetResult, error) {
-	if ic.Client == nil {
+func (c *AuthorizationClient) ListService() (*cos.ServiceGetResult, error) {
+	if c.Client == nil {
 		return nil, errors.New("client with not Init")
 	}
 
-	service, _, err := ic.Client.Service.Get(context.Background())
+	service, _, err := c.Client.Service.Get(context.Background())
 	if err != nil {
 		log.Fatal(err)
 
@@ -81,9 +89,9 @@ func (ic *InitClient) GetService() (*cos.ServiceGetResult, error) {
 	return service, nil
 }
 
-// GetBucketsList for get all buckets of user
-func (ic *InitClient) GetBucketsList() ([]cos.Bucket, error) {
-	service, err := ic.GetService()
+// ListBuckets for get all buckets of user
+func (c *AuthorizationClient) ListBuckets() ([]cos.Bucket, error) {
+	service, err := c.ListService()
 	if err != nil {
 		return nil, err
 	}
@@ -99,15 +107,15 @@ func (ic *InitClient) GetBucketsList() ([]cos.Bucket, error) {
 	return []cos.Bucket{}, errors.New("no bucket exits")
 }
 
-// GetBucketClient for get a bucket operation client
-func (ic *InitClient) GetBucketClient(bucket cos.Bucket) *cos.Client {
+// BucketClient for get a bucket operation client
+func (c *AuthorizationClient) BucketClient(bucket *cos.Bucket) *cos.Client {
 	bucketURL, _ := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", bucket.Name, bucket.Region))
 	baseURL := &cos.BaseURL{BucketURL: bucketURL}
 
 	return cos.NewClient(baseURL, &http.Client{
 		Transport: &cos.AuthorizationTransport{
-			SecretID:  ic.Config["SecretID"],
-			SecretKey: ic.Config["SecretKey"],
+			SecretID:  c.Config.SecretID,
+			SecretKey: c.Config.SecretKey,
 			Transport: &debug.DebugRequestTransport{
 				RequestHeader:  isDebug,
 				RequestBody:    isDebug,
@@ -119,8 +127,8 @@ func (ic *InitClient) GetBucketClient(bucket cos.Bucket) *cos.Client {
 }
 
 // GetObjectsList for get all objects in bucket
-func (ic *InitClient) GetObjectsList(bucket cos.Bucket) ([]cos.Object, error) {
-	client := ic.GetBucketClient(bucket)
+func (c *AuthorizationClient) GetObjectsList(bucket *cos.Bucket) ([]cos.Object, error) {
+	client := c.BucketClient(bucket)
 
 	opt := &cos.BucketGetOptions{}
 
