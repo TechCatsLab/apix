@@ -61,7 +61,6 @@ type Context interface {
 type context struct {
 	req   *http.Request
 	res   http.ResponseWriter
-	app   *App
 	store map[string]interface{}
 }
 
