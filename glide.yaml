@@ -4,3 +4,8 @@ import:
   version: ^7.2.3
 - package: github.com/mozillazg/go-cos
   version: ^0.7.0
+- package: github.com/dgrijalva/jwt-go
+  version: v3.2.0
+- package: github.com/auth0/go-jwt-middleware
+- package: github.com/rs/cors
+  version: v1.4.0
