@@ -3,7 +3,7 @@
  *     Initial: 2018/05/26        ShiChao
  */
 
-package xhttp
+package http
 
 // HTTP methods
 const (

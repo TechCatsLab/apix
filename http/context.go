@@ -3,7 +3,7 @@
  *     Initial: 2018/05/26        ShiChao
  */
 
-package xhttp
+package http
 
 import (
 	"errors"
@@ -29,75 +29,48 @@ type Context interface {
 
 	Response() http.ResponseWriter
 
-	IsTLS() bool
-
-	IsWebSocket() bool
-
-	IP() string
-
 	FormValue(name string) string
 
 	FormParams() (url.Values, error)
-
-	Cookie(name string) (*http.Cookie, error)
-
-	SetCookie(cookie *http.Cookie)
-
-	Cookies() []*http.Cookie
 
 	Get(key string) interface{}
 
 	Set(key string, val interface{})
 
-	JSON(code int, i interface{}) error
+	ServeJSON(code int, i interface{}) error
 
-	JSONBody(v interface{}) error
-
-	Redirect(code int, url string) error
-
+	ParseJSONBody(v interface{}) error
+	
 	Reset(r *http.Request, w http.ResponseWriter)
 }
 
-type context struct {
+type ctx struct {
 	req   *http.Request
 	res   http.ResponseWriter
 	store map[string]interface{}
 }
 
-func newContext() (ctx Context) {
-	return &context{}
+func newContext() Context {
+	return &ctx{}
 }
 
-func (c *context) Request() *http.Request {
+func (c *ctx) Request() *http.Request {
 	return c.req
 }
 
-func (c *context) SetRequest(r *http.Request) {
+func (c *ctx) SetRequest(r *http.Request) {
 	c.req = r
 }
 
-func (c *context) Response() http.ResponseWriter {
+func (c *ctx) Response() http.ResponseWriter {
 	return c.res
 }
 
-func (c *context) IsTLS() bool {
-	return c.req.TLS != nil
-}
-
-func (c *context) IsWebSocket() bool {
-	upgrade := c.req.Header.Get(HeaderUpgrade)
-	return upgrade == "websocket" || upgrade == "Websocket"
-}
-
-func (c *context) IP() string {
-	return c.req.RemoteAddr
-}
-
-func (c *context) FormValue(name string) string {
+func (c *ctx) FormValue(name string) string {
 	return c.req.FormValue(name)
 }
 
-func (c *context) FormParams() (url.Values, error) {
+func (c *ctx) FormParams() (url.Values, error) {
 	if strings.HasPrefix(c.req.Header.Get(HeaderContentType), MIMEMultipartForm) {
 		if err := c.req.ParseMultipartForm(defaultMemory); err != nil {
 			return nil, err
@@ -110,30 +83,18 @@ func (c *context) FormParams() (url.Values, error) {
 	return c.req.Form, nil
 }
 
-func (c *context) Cookie(name string) (*http.Cookie, error) {
-	return c.req.Cookie(name)
-}
-
-func (c *context) SetCookie(cookie *http.Cookie) {
-	http.SetCookie(c.Response(), cookie)
-}
-
-func (c *context) Cookies() []*http.Cookie {
-	return c.req.Cookies()
-}
-
-func (c *context) Get(key string) interface{} {
+func (c *ctx) Get(key string) interface{} {
 	return c.store[key]
 }
 
-func (c *context) Set(key string, val interface{}) {
+func (c *ctx) Set(key string, val interface{}) {
 	if c.store == nil {
 		c.store = make(map[string]interface{})
 	}
 	c.store[key] = val
 }
 
-func (c *context) JSON(code int, v interface{}) (err error) {
+func (c *ctx) ServeJSON(code int, v interface{}) (err error) {
 	if v == nil {
 		return errEmptyResponse
 	}
@@ -149,7 +110,7 @@ func (c *context) JSON(code int, v interface{}) (err error) {
 	return err
 }
 
-func (c *context) JSONBody(v interface{}) error {
+func (c *ctx) ParseJSONBody(v interface{}) error {
 	if c.req.ContentLength == 0 {
 		return errNoBody
 	}
@@ -169,16 +130,7 @@ func isJson(s string) bool {
 	return strings.EqualFold(s, j) || strings.EqualFold(s, jsonCharset)
 }
 
-func (c *context) Redirect(code int, url string) error {
-	if code < 300 || code > 308 {
-		return errInvalidRedirectCode
-	}
-	c.res.Header().Set(HeaderLocation, url)
-	c.res.WriteHeader(code)
-	return nil
-}
-
-func (c *context) Reset(r *http.Request, w http.ResponseWriter) {
+func (c *ctx) Reset(r *http.Request, w http.ResponseWriter) {
 	c.req = r
 	c.res = w
 	c.store = nil

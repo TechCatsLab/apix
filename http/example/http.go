@@ -11,14 +11,14 @@ import (
 )
 
 func main() {
-	app := xhttp.New()
-	app.Get("/", handle)
+	server := http.New()
+	server.Get("/", handle)
 
-	app.Use(negroni.NewLogger())
-	app.RunTLS(":3344", "../certs/server.crt", "../certs/server.key")
+	server.Use(negroni.NewLogger())
+	server.RunTLS(":3344", "./certs/server.crt", "./certs/server.key")
 }
 
-func handle(ctx xhttp.Context) error {
+func handle(ctx http.Context) error {
 	//panic("panic test")
 
 	res := ctx.Response()
