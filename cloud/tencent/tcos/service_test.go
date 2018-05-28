@@ -11,24 +11,26 @@ import (
 
 const (
 	APPID = "1255567157"
-	SID = "AKIDUsALNDBVwIUVFMD8mfKtKeqdefWFuu1y"
-	SKEY = "KeyXXXXXXXXXXXXXX"
+	SID   = "AKIDmW6azJ7hOyUpz26kP7h6PYWJwW2NeZYO"
+	SKEY  = "KEY-XXX"
 )
 
 func TestCreateAuthorizationClient(t *testing.T) {
 	var configs = []AuthorizationConfig{{
-		AppID: "",
+		AppID:     APPID,
 		SecretID:  SID,
 		SecretKey: SKEY,
 	}, {
+		AppID:     APPID,
 		SecretID:  SID,
 		SecretKey: "",
 	}, {
-		AppID: "sadasd",
+		AppID:     APPID,
 		SecretKey: SKEY,
 	}, {}, {
+		AppID:     APPID,
 		SecretID:  SID,
-		SecretKey: "unvaildkey",
+		SecretKey: "unvalidkey",
 	}}
 
 	for i, config := range configs {
@@ -43,33 +45,67 @@ func TestCreateAuthorizationClient(t *testing.T) {
 			if err.Error() != "empty secret Key" {
 				t.Error(err)
 			}
-		case 2, 3:
+		case 2:
 			if err.Error() != "empty secret ID" {
 				t.Error(err)
 			}
-		case 4:
-			if err.Error() != "authorization failed" {
+		case 3:
+			if err.Error() != "empty app ID" {
 				t.Error(err)
 			}
+		case 4:
+			if opErr, ok := err.(*OpError); ok && opErr.Code != "SignatureDoesNotMatch" {
+				t.Error(err)
+			}
+		default:
+			t.Error(i, err)
 		}
 	}
 }
 
-func TestListBuckets(t *testing.T) {
+func TestAuthorizationClient_ListBuckets(t *testing.T) {
 	var configs = []AuthorizationConfig{{
+		AppID:     APPID,
 		SecretID:  SID,
 		SecretKey: SKEY,
 	}}
 
 	if authorizationClient, err := CreateAuthorizationClient(configs[0]); err != nil {
 		t.Error(err)
-	} else {
+	} else if authorizationClient != nil {
 		buckets, err := authorizationClient.ListBuckets()
+		for _, bucket := range buckets {
+			t.Logf("Buckets: %#v\n", bucket)
+		}
 		if err != nil {
 			t.Error(err)
 		}
 		if buckets == nil {
 			t.Error("unexpected nil of buckets")
+		}
+	}
+}
+
+func TestAuthorizationClient_CreateBucketClient(t *testing.T) {
+	var config = &AuthorizationConfig{
+		AppID:     APPID,
+		SecretID:  SID,
+		SecretKey: SKEY,
+	}
+
+	if authorizationClient, err := CreateAuthorizationClient(*config); err != nil {
+		t.Error(err)
+	} else if authorizationClient != nil {
+		buckets, err := authorizationClient.ListBuckets()
+		if err != nil {
+			t.Error(err)
+		}
+
+		for i := range buckets {
+			_, err := authorizationClient.CreateBucketClient(&buckets[i])
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 }

@@ -7,20 +7,24 @@ package tcos
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
-	"errors"
 
 	"github.com/mozillazg/go-cos"
 	"github.com/mozillazg/go-cos/debug"
 )
 
-// AuthorizationConfig is used for Authorization.
-// get values from https://console.cloud.tencent.com/cam/capi
-// set policy for permission in https://console.cloud.tencent.com/cam/policy
+const isDebug = false // enable output http message log
+
+// AuthorizationConfig contains AppID, SecretID, SecretKey.
+// AppID can be used to create a new bucket. SecretID & SecretKey are used for AuthorizationTransport.
+// Get values from https://console.cloud.tencent.com/cam/capi
+// Set policy for permission in https://console.cloud.tencent.com/cam/policy
 type AuthorizationConfig struct {
-	AppID     string // optional, AppID is used to creating new bucket
+	AppID     string // mandatory
 	SecretID  string // mandatory
 	SecretKey string // mandatory
 }
@@ -31,15 +35,11 @@ type AuthorizationClient struct {
 	Client *cos.Client
 }
 
-const isDebug = false // enable output http message log
-
-// CreateAuthorizationClient creates a client for GetService().
+// CreateAuthorizationClient creates a service client.
+// Client contains BaseURL, common service, *ServiceService, *BucketService, *ObjectService
 func CreateAuthorizationClient(config AuthorizationConfig) (*AuthorizationClient, error) {
-	if config.SecretID == "" {
-		return nil, errors.New("empty secret ID")
-	}
-	if config.SecretKey == "" {
-		return nil, errors.New("empty secret Key")
+	if err := CheckAuthorizationConfig(config); err != nil {
+		return nil, err
 	}
 
 	c := &AuthorizationClient{
@@ -61,14 +61,17 @@ func CreateAuthorizationClient(config AuthorizationConfig) (*AuthorizationClient
 
 	err := ConfirmAuthorization(c.Client)
 	if err != nil {
-		return nil, errors.New("authorization failed")
+		if opErr, ok := ErrConvert(err); ok {
+			return nil, opErr
+		}
+		return nil, err
 	}
 
 	return c, nil
 }
 
-// GetService returns a service
-func (c *AuthorizationClient) GetService() (*cos.ServiceGetResult, error) {
+// Service returns a service, which contains Owner and Buckets.
+func (c *AuthorizationClient) Service() (*cos.ServiceGetResult, error) {
 	if c.Client == nil {
 		return nil, errors.New("unauthorized client")
 	}
@@ -83,15 +86,15 @@ func (c *AuthorizationClient) GetService() (*cos.ServiceGetResult, error) {
 
 // ListBuckets is used to get all buckets of authorized user
 func (c *AuthorizationClient) ListBuckets() ([]Bucket, error) {
-	service, err := c.GetService()
+	service, err := c.Service()
 	if err != nil {
 		return nil, err
 	}
 
 	if len(service.Buckets) > 0 {
-		for _, bucket := range service.Buckets {
-			fmt.Printf("Buckets: %#v\n", bucket)
-		}
+		//for _, bucket := range service.Buckets {
+		//	log.Printf("Buckets: %#v\n", bucket)
+		//}
 
 		return service.Buckets, nil
 	}
@@ -101,6 +104,8 @@ func (c *AuthorizationClient) ListBuckets() ([]Bucket, error) {
 
 // CreateBucketClient is used to get a bucket client by AuthorizationClient
 func (c *AuthorizationClient) CreateBucketClient(bucket *Bucket) (*BucketClient, error) {
+	// e.g. BucketURL: https://bucketname-appid.cos.region.myqcloud.com
+	// ListBuckets() return bucket like this: cos.Bucket{Name:"test-1255567152", AppID:"", Region:"ap-shanghai", CreateDate:""}
 	bucketURL, err := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", bucket.Name, bucket.Region))
 	if err != nil {
 		return nil, err
@@ -127,7 +132,10 @@ func (c *AuthorizationClient) CreateBucketClient(bucket *Bucket) (*BucketClient,
 
 	err = ConfirmBucket(bc.Client)
 	if err != nil {
-		return nil, errors.New("unavailable bucket client")
+		if opErr, ok := ErrConvert(err); ok {
+			return nil, opErr
+		}
+		return nil, err
 	}
 
 	return bc, nil
@@ -135,10 +143,62 @@ func (c *AuthorizationClient) CreateBucketClient(bucket *Bucket) (*BucketClient,
 
 // ConfirmAuthorization is used to confirm authorization info
 func ConfirmAuthorization(client *cos.Client) error {
+	if client == nil {
+		return errors.New("missing client of authorization")
+	}
+
 	_, resp, err := client.Service.Get(context.Background())
 	if code := resp.StatusCode; !(200 <= code && code <= 299) && err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// CheckAuthorizationConfig ...
+func CheckAuthorizationConfig(config AuthorizationConfig) error {
+	if config.AppID == "" {
+		return errors.New("empty app ID")
+	}
+	if config.SecretID == "" {
+		return errors.New("empty secret ID")
+	}
+	if config.SecretKey == "" {
+		return errors.New("empty secret Key")
+	}
+
+	return nil
+}
+
+// OpError contains code & message, which describes the Err
+type OpError struct {
+	Code    string
+	Message string
+	Err     error
+}
+
+// Error return string format
+func (err *OpError) Error() string {
+	if err.Code != "" {
+		return fmt.Sprintf("%s(%s): %s", err.Code, err.Message, err.Err)
+	}
+
+	return fmt.Sprintf("%s: %s", err.Message, err.Err)
+}
+
+// ErrConvert to OpError
+func ErrConvert(err error) (*OpError, bool) {
+	switch v := err.(type) {
+	case *url.Error:
+		if dnsErr, ok := v.Err.(*net.OpError).Err.(*net.DNSError); ok {
+			// e.g. 'no such host' DNSError
+			return &OpError{dnsErr.Err, dnsErr.Name, err}, true
+		} else {
+			return &OpError{v.Op, v.URL, v.Err}, true
+		}
+	case *cos.ErrorResponse:
+		return &OpError{v.Code, v.Message, err}, true
+	}
+
+	return nil, false
 }
