@@ -18,6 +18,7 @@ import (
 )
 
 const isDebug = false // enable output http message log
+const isLog = true // enable operation log
 
 // AuthorizationConfig contains AppID, SecretID, SecretKey.
 // AppID can be used to create a new bucket. SecretID & SecretKey are used for AuthorizationTransport.

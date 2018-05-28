@@ -6,21 +6,26 @@
 package tcos
 
 import (
-	"os"
 	"context"
-	"log"
+	"io"
 	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
 	"path/filepath"
 
+	"fmt"
+
 	"github.com/mozillazg/go-cos"
-	"io"
+	"github.com/pkg/errors"
 )
 
 // Object contains Key, ETag, Size, PartNumber, LastModified, StorageClass, Owner of created object
 // e.g. Object{Key:"text.txt", ETag:"\"847f4281d3e9ad10844ef37da835cfc0\"", Size:4545, PartNumber:0, LastModified:"2018-05-22T14:39:23.000Z", StorageClass:"STANDARD", Owner:(*cos.Owner)(0xc42018bb00)}
 type Object = cos.Object
 
-// ObjectPutOptions see https://intl.cloud.tencent.com/document/product/436/7749#request-header
+// ObjectPutOptions contains ACLHeaderOptions and ObjectPutHeaderOptions
+// details see https://intl.cloud.tencent.com/document/product/436/7749#request-header
 type ObjectPutOptions = cos.ObjectPutOptions
 
 // ACLHeaderOptions ...
@@ -29,17 +34,32 @@ type ACLHeaderOptions = cos.ACLHeaderOptions
 // ObjectPutHeaderOptions ...
 type ObjectPutHeaderOptions = cos.ObjectPutHeaderOptions
 
-// PutObject to bucket.
-func (c *BucketClient) PutObject(name string, reader io.Reader, opt *ObjectPutOptions) error {
-	_, err := c.Client.Object.Put(context.Background(), name, reader, opt)
+// ObjectGetOptions is used for GetObject()
+// details see https://intl.cloud.tencent.com/document/product/436/7753
+type ObjectGetOptions = cos.ObjectGetOptions
+
+// ObjectHeadOptions specified "IfModifiedSince" Header
+type ObjectHeadOptions = cos.ObjectHeadOptions
+
+// PutObject to bucket. This action requires WRITE permission for the Bucket.
+func (c *BucketClient) PutObject(objectKey string, reader io.Reader, opt *ObjectPutOptions) error {
+	if objectKey == "" {
+		return errors.New("empty objectKey")
+	}
+
+	_, err := c.Client.Object.Put(context.Background(), objectKey, reader, opt)
 	if err != nil {
 		return err
+	}
+
+	if isLog {
+		log.Printf("Put object \"%s\" in bucket \"%s\"\n", objectKey, c.Name)
 	}
 
 	return nil
 }
 
-// ListObjects is used to get all objects in bucket
+// ListObjects is used to get all objects in bucket. This action requires READ permission for the Bucket.
 // see options details in https://intl.cloud.tencent.com/document/product/436/7734#request-parameters
 func (c *BucketClient) ListObjects(opt *BucketGetOptions) ([]Object, error) {
 	if opt == nil {
@@ -54,12 +74,103 @@ func (c *BucketClient) ListObjects(opt *BucketGetOptions) ([]Object, error) {
 	return bucketInfo.Contents, nil
 }
 
-// Download files to local
-func Download(client *cos.Client, objectKey, path, filename string) error {
-	resp, err := client.Object.Get(context.Background(), objectKey, nil)
-	if err != nil {
-		log.Fatalln("get object err: ", err)
+// DeleteObject is used to delete one file (Object) in Bucket. This action requires WRITE permission for the Bucket.
+// if the named object doesn't exit, delete operation is ok and return 204 - No Content
+func (c *BucketClient) DeleteObject(objectKey string) error {
+	if objectKey == "" {
+		return errors.New("empty objectKey")
+	}
 
+	_, err := c.Client.Object.Delete(context.Background(), objectKey)
+	if err != nil {
+		return err
+	}
+
+	if isLog {
+		log.Printf("Delete object \"%s\" in bucket \"%s\"\n", objectKey, c.Name)
+	}
+
+	return nil
+}
+
+// GetObject ...
+func (c *BucketClient) GetObject(objectKey string, opt *ObjectGetOptions) (*http.Response, error) {
+	if objectKey == "" {
+		return nil, errors.New("empty objectKey")
+	}
+
+	resp, err := c.Client.Object.Get(context.Background(), objectKey, opt)
+	if err != nil {
+		if opErr, ok := ErrConvert(err); ok {
+			return nil, opErr
+		}
+		return nil, err
+	}
+
+	return resp.Response, nil
+}
+
+// ObjectDownloadURL ...
+func (c *BucketClient) ObjectDownloadURL(objectKey string) (string, error) {
+	if objectKey == "" {
+		return "", errors.New("empty objectKey")
+	}
+
+	_, err := c.GetObject(objectKey, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("https://%s-%s.cos.%s.myqcloud.com/%s", c.BucketConfig.Name, c.BucketConfig.AppID, c.BucketConfig.Region, objectKey), nil
+}
+
+// HeadObject requests object meta info.
+// if opt specified "IfModifiedSince" Header and object is not modified, response 304
+func (c *BucketClient) HeadObject(objectKey string, opt *ObjectHeadOptions) error {
+	if objectKey == "" {
+		return errors.New("empty objectKey")
+	}
+
+	resp, err := c.Client.Object.Head(context.Background(), objectKey, opt)
+	if resp != nil {
+		switch resp.StatusCode {
+		case 404:
+			return &OpError{"404", "NoSuchObject", err}
+		case 304:
+			return &OpError{"304", "NotModified", err}
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DownloadObject ...
+func (c *BucketClient) DownloadObject(objectKey string, writer io.Writer) error {
+	if objectKey == "" {
+		return errors.New("empty objectKey")
+	}
+
+	resp, err := c.GetObject(objectKey, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(writer, resp.Body)
+
+	return err
+}
+
+// DownloadToLocal object to local
+func DownloadToLocal(client *BucketClient, objectKey, localPath, filename string) error {
+	if objectKey == "" {
+		return errors.New("empty objectKey")
+	}
+
+	resp, err := client.GetObject(objectKey, nil)
+	if err != nil {
 		return err
 	}
 
@@ -71,14 +182,14 @@ func Download(client *cos.Client, objectKey, path, filename string) error {
 	}
 	defer resp.Body.Close()
 
-	if err = checkPath(path); err != nil {
+	if err = checkPath(localPath); err != nil {
 		log.Fatalln(err)
 
 		return err
 	}
 
 	//log.Println(resp.Request.URL, resp.ContentLength, len(data), "\n")
-	if err = ioutil.WriteFile(filepath.Join(path, filename), data, 0666); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(localPath, filename), data, 0666); err != nil {
 		log.Fatalln("write file err: ", err)
 
 		return err

@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -89,6 +90,9 @@ func PutBucket(config BucketConfig, options *BucketPutOptions) (*BucketClient, e
 	}
 
 	bc := &BucketClient{&config, c}
+	if isLog {
+		log.Printf("Put bucket \"%s\"\n", bc.Name)
+	}
 
 	return bc, nil
 }
@@ -157,6 +161,10 @@ func (c *BucketClient) Delete() error {
 	}
 	if err != nil {
 		return err
+	}
+
+	if isLog {
+		log.Printf("Delete bucket \"%s\"\n", c.Name)
 	}
 
 	return nil

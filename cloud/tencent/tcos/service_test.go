@@ -12,7 +12,7 @@ import (
 const (
 	APPID = "1255567157"
 	SID   = "AKIDmW6azJ7hOyUpz26kP7h6PYWJwW2NeZYO"
-	SKEY  = "KEY-XXX"
+	SKEY  = "KEY-XXXXX"
 )
 
 func TestCreateAuthorizationClient(t *testing.T) {
@@ -75,7 +75,7 @@ func TestAuthorizationClient_ListBuckets(t *testing.T) {
 	} else if authorizationClient != nil {
 		buckets, err := authorizationClient.ListBuckets()
 		for _, bucket := range buckets {
-			t.Logf("Buckets: %#v\n", bucket)
+			t.Logf("Bucket: %#v\n", bucket)
 		}
 		if err != nil {
 			t.Error(err)
