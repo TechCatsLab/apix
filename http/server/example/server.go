@@ -8,8 +8,8 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"github.com/TechCatsLab/apix/server"
-	"github.com/TechCatsLab/apix/server/middleware"
+	"github.com/TechCatsLab/apix/http/servererver"
+	"github.com/TechCatsLab/apix/http/servererver/middleware"
 	"github.com/dgrijalva/jwt-go"
 )
 
