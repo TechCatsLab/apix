@@ -6,10 +6,10 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/urfave/negroni"
-	"fmt"
 )
 
 // NegroniRecoverHandler returns a handler for recover from a http request.

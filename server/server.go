@@ -18,46 +18,6 @@ import (
 	"github.com/urfave/negroni"
 )
 
-const (
-	// charset
-	charsetUTF8 = "charset=UTF-8"
-
-	// HTTP methods
-	PUT     = "PUT"
-	GET     = "GET"
-	POST    = "POST"
-	HEAD    = "HEAD"
-	PATCH   = "PATCH"
-	DELETE  = "DELETE"
-	OPTIONS = "OPTIONS"
-
-	// MIME
-	MIMEApplicationJSON            = "application/json"
-	MIMEApplicationJSONCharsetUTF8 = MIMEApplicationJSON + "; " + charsetUTF8
-	MIMEMultipartForm              = "multipart/form-data"
-
-	// Headers
-	HeaderOrigin        = "Origin"
-	HeaderAccept        = "Accept"
-	HeaderVary          = "Vary"
-	HeaderCookie        = "Cookie"
-	HeaderSetCookie     = "Set-Cookie"
-	HeaderUpgrade       = "Upgrade"
-	HeaderContentType   = "Content-Type"
-	HeaderLocation      = "Location"
-	HeaderAuthorization = "Authorization"
-
-	// Access control
-	HeaderAccessControlRequestMethod    = "Access-Control-Request-Method"
-	HeaderAccessControlAllowMethods     = "Access-Control-Allow-Methods"
-	HeaderAccessControlRequestHeaders   = "Access-Control-Request-Headers"
-	HeaderAccessControlAllowOrigin      = "Access-Control-Allow-Origin"
-	HeaderAccessControlAllowHeaders     = "Access-Control-Allow-Headers"
-	HeaderAccessControlExposeHeaders    = "Access-Control-Expose-Headers"
-	HeaderAccessControlAllowCredentials = "Access-Control-Allow-Credentials"
-	HeaderAccessControlMaxAge           = "Access-Control-Max-Age"
-)
-
 var (
 	errNoRouter  = errors.New("entrypoint requires a router")
 	errTLSConfig = errors.New("cert or key file in the TLS configuration does not exist")
@@ -197,9 +157,14 @@ func (ep *Entrypoint) Start(router http.Handler) error {
 	return nil
 }
 
-// Wait until stop channel emits a value.
+// Run until stop channel emits a value.
 func (ep *Entrypoint) Run() {
 	<-ep.stop
+}
+
+// Wait until stop channel emits a value.
+func (ep *Entrypoint) Wait() {
+	ep.Run()
 }
 
 // Stop the http server.
