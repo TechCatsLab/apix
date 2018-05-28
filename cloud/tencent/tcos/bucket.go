@@ -9,12 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 
 	"github.com/mozillazg/go-cos"
 	"github.com/mozillazg/go-cos/debug"
@@ -47,17 +43,17 @@ type BucketPutOptions = cos.BucketPutOptions
 
 // PutBucket is used to create a new bucket.
 // options: https://intl.cloud.tencent.com/document/product/436/7738#request-header
-func PutBucket(config BucketConfig, options *BucketPutOptions) error {
+func PutBucket(config BucketConfig, options *BucketPutOptions) (*BucketClient, error) {
 	if config.AuthorizationConfig == nil {
-		return errors.New("missing AuthorizationConfig")
+		return nil, errors.New("missing AuthorizationConfig")
 	}
 	if err := CheckAuthorizationConfig(*config.AuthorizationConfig); err != nil {
-		return err
+		return nil, err
 	}
 
 	bucketURL, err := url.Parse(fmt.Sprintf("https://%s-%s.cos.%s.myqcloud.com", config.Name, config.AppID, config.Region))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	baseURL := &cos.BaseURL{
@@ -83,16 +79,18 @@ func PutBucket(config BucketConfig, options *BucketPutOptions) error {
 	}
 	resp, err := c.Bucket.Put(context.Background(), options)
 	if resp != nil && resp.StatusCode == 409 {
-		return errors.New("BucketAlreadyExists")
+		return nil, errors.New("BucketAlreadyExists")
 	}
 	if err != nil {
 		if opErr, ok := ErrConvert(err); ok {
-			return opErr
+			return nil, opErr
 		}
-		return err
+		return nil, err
 	}
 
-	return nil
+	bc := &BucketClient{&config, c}
+
+	return bc, nil
 }
 
 // CreateBucketClient creates a bucket client, which can request bucket operations
@@ -135,35 +133,14 @@ func CreateBucketClient(config BucketConfig) (*BucketClient, error) {
 
 	err = ConfirmAuthorization(c.Client)
 	if err != nil {
-		if opErr, ok := ErrConvert(err); ok {
-			return nil, opErr
-		}
 		return nil, err
 	}
-	err = ConfirmBucket(c.Client)
+	err = HeadBucket(c.Client)
 	if err != nil {
-		if opErr, ok := ErrConvert(err); ok {
-			return nil, opErr
-		}
 		return nil, err
 	}
 
 	return c, nil
-}
-
-// ListObjects is used to get all objects in bucket
-// see options details in https://intl.cloud.tencent.com/document/product/436/7734#request-parameters
-func (c *BucketClient) ListObjects(opt *BucketGetOptions) ([]cos.Object, error) {
-	bucketInfo, _, err := c.Client.Bucket.Get(context.Background(), opt)
-	if err != nil {
-		return nil, err
-	}
-
-	//for _, object := range bucketInfo.Contents {
-	//	log.Fatalln("%#v\n", object)
-	//}
-
-	return bucketInfo.Contents, nil
 }
 
 // Delete the bucket. The bucket must be empty before deleting.
@@ -185,66 +162,25 @@ func (c *BucketClient) Delete() error {
 	return nil
 }
 
-// ConfirmBucket is used to confirm bucket client is available or not
-func ConfirmBucket(client *cos.Client) error {
-	if client == nil {
-		return errors.New("missing client of bucket")
-	}
-
-	opt := &cos.BucketGetOptions{}
-	_, _, err := client.Bucket.Get(context.Background(), opt)
-	if err != nil {
-		opErr, _ := ErrConvert(err)
-
-		return opErr
-	}
-
-	return nil
-}
-
-// Download files to local
-func Download(client *cos.Client, objectKey, path, filename string) error {
-	resp, err := client.Object.Get(context.Background(), objectKey, nil)
-	if err != nil {
-		log.Fatalln("get object err: ", err)
-
-		return err
-	}
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalln("read resp body err: ", err)
-
-		return err
-	}
-	defer resp.Body.Close()
-
-	if err = checkPath(path); err != nil {
-		log.Fatalln(err)
-
-		return err
-	}
-
-	//log.Println(resp.Request.URL, resp.ContentLength, len(data), "\n")
-	if err = ioutil.WriteFile(filepath.Join(path, filename), data, 0666); err != nil {
-		log.Fatalln("write file err: ", err)
-
-		return err
-	}
-
-	return nil
-}
-
-// CheckPath is used to create directory if the path doesn't exit
-func checkPath(path string) error {
-	_, err := os.Stat(path)
-
-	if err != nil {
-		if os.IsNotExist(err) {
-			if err = os.MkdirAll(path, 0777); err != nil {
-				return err
-			}
+// HeadBucket tests bucket is available or not
+// Status: 200 - ok, 403 - Forbidden, 404 - Not Found
+func HeadBucket(client *cos.Client) error {
+	resp, err := client.Bucket.Head(context.Background())
+	if resp != nil {
+		switch resp.StatusCode {
+		case 200:
+			return nil
+		case 403:
+			return &OpError{"403", "AccessDenied", err}
+		case 404:
+			return &OpError{"404", "NoSuchBucket", err}
 		}
+	}
+	if err != nil {
+		if opErr, ok := ErrConvert(err); ok {
+			return opErr
+		}
+		return err
 	}
 
 	return nil

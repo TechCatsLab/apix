@@ -61,9 +61,6 @@ func CreateAuthorizationClient(config AuthorizationConfig) (*AuthorizationClient
 
 	err := ConfirmAuthorization(c.Client)
 	if err != nil {
-		if opErr, ok := ErrConvert(err); ok {
-			return nil, opErr
-		}
 		return nil, err
 	}
 
@@ -104,7 +101,7 @@ func (c *AuthorizationClient) ListBuckets() ([]Bucket, error) {
 
 // CreateBucketClient is used to get a bucket client by AuthorizationClient
 func (c *AuthorizationClient) CreateBucketClient(bucket *Bucket) (*BucketClient, error) {
-	// e.g. BucketURL: https://bucketname-appid.cos.region.myqcloud.com
+	// e.g. BucketURL: https://<bucketname-appid>.cos.<region>.myqcloud.com
 	// ListBuckets() return bucket like this: cos.Bucket{Name:"test-1255567152", AppID:"", Region:"ap-shanghai", CreateDate:""}
 	bucketURL, err := url.Parse(fmt.Sprintf("https://%s.cos.%s.myqcloud.com", bucket.Name, bucket.Region))
 	if err != nil {
@@ -130,11 +127,8 @@ func (c *AuthorizationClient) CreateBucketClient(bucket *Bucket) (*BucketClient,
 		},
 	})
 
-	err = ConfirmBucket(bc.Client)
+	err = HeadBucket(bc.Client)
 	if err != nil {
-		if opErr, ok := ErrConvert(err); ok {
-			return nil, opErr
-		}
 		return nil, err
 	}
 
@@ -148,7 +142,15 @@ func ConfirmAuthorization(client *cos.Client) error {
 	}
 
 	_, resp, err := client.Service.Get(context.Background())
-	if code := resp.StatusCode; !(200 <= code && code <= 299) && err != nil {
+	if resp != nil {
+		if code := resp.StatusCode; 200 <= code && code <= 299 {
+			return nil
+		}
+	}
+	if err != nil {
+		if opErr, ok := ErrConvert(err); ok {
+			return opErr
+		}
 		return err
 	}
 
@@ -193,9 +195,8 @@ func ErrConvert(err error) (*OpError, bool) {
 		if dnsErr, ok := v.Err.(*net.OpError).Err.(*net.DNSError); ok {
 			// e.g. 'no such host' DNSError
 			return &OpError{dnsErr.Err, dnsErr.Name, err}, true
-		} else {
-			return &OpError{v.Op, v.URL, v.Err}, true
 		}
+		return &OpError{v.Op, v.URL, v.Err}, true
 	case *cos.ErrorResponse:
 		return &OpError{v.Code, v.Message, err}, true
 	}

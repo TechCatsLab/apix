@@ -40,13 +40,13 @@ func TestPutBucket(t *testing.T) {
 	opt := &BucketPutOptions{
 		XCosACL: "XXXXXXXXXXX",
 	}
-	err := PutBucket(configs[0], opt)
+	_, err := PutBucket(configs[0], opt)
 	if opErr, ok := err.(*OpError); (ok && opErr.Code != "InvalidArgument") || !ok {
 		t.Error(err)
 	}
 
 	for i, config := range configs {
-		err := PutBucket(config, nil)
+		_, err := PutBucket(config, nil)
 		switch i {
 		case 0:
 			if err != nil {
@@ -197,7 +197,7 @@ func TestBucketClient_Delete(t *testing.T) {
 		 		t.Error(err)
 		 	}
 		case 3:
-			if opErr, ok := err.(*OpError); ok && opErr.Code != "NoSuchBucket" {
+			if opErr, ok := err.(*OpError); ok && opErr.Message != "NoSuchBucket" {
 				t.Error(err)
 			}
 		default:
