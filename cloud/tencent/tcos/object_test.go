@@ -9,6 +9,7 @@ import (
 	"os"
 	_ "io/ioutil"
 	"testing"
+	"fmt"
 )
 
 var (
@@ -47,7 +48,7 @@ func TestBucketClient_PutObject(t *testing.T) {
 				ContentLength: int(s.Size()),
 			},
 		}
-		err = client.PutObject(s.Name(), f, opt)
+		_, err = client.PutObject(s.Name(), f, false, opt)
 		if err != nil {
 			t.Error(err)
 		}
@@ -67,12 +68,60 @@ func TestBucketClient_PutObject(t *testing.T) {
 			ContentLength: int(s.Size()),
 		},
 	}
-	err = client.PutObject("files/" + s.Name(), f, opt)
+	_, err = client.PutObject(fmt.Sprintf("files/%s", s.Name()), f, false, opt)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = client.PutObject("new folder/", nil, nil)
+	_, err = client.PutObject("newfolder/", nil, false, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = client.PutObject("newfolder/", nil, false, nil)
+	if err.Error() != "ObjectAlreadyExists(enable force if you want to overwrite)" {
+		t.Error(err)
+	}
+}
+
+func TestBucketClient_Copy(t *testing.T) {
+	client, err := CreateBucketClient(*bucketConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// copy bucket.go to files/
+	_, _, err = client.Copy(filesname[1], "files/" + filesname[1], true, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// overwrite no force
+	_, _, err = client.Copy(filesname[0], "files/" + filesname[0], false, nil)
+	if err.Error() != "ObjectAlreadyExists(enable force if you still want to copy)" {
+		t.Error(err)
+	}
+
+	// overwrite object.go with force
+	_, _, err = client.Copy(filesname[0], "files/" + filesname[0], true, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// move files/bucket.go to newfolder/
+	_, _, err = client.Move("files/" + filesname[1], "newfolder/" + filesname[1], true, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// rename but filename conflicts with other files
+	_, _, err = client.Rename(filesname[2], filesname[1], nil)
+	if err.Error() != "this action conflicts with other files" {
+		t.Error(err)
+	}
+
+	// rename newfolder/bucket.go
+	_, _, err = client.Rename("newfolder/" + filesname[1], "rename.go", nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -86,7 +135,7 @@ func TestBucketClient_ListObjects(t *testing.T) {
 
 	list, err := client.ListObjects(nil)
 	for _, obj := range list {
-		t.Logf("Object: %#v\n", obj)
+		t.Logf("Object: %+v\n", obj)
 	}
 	if err != nil {
 		t.Error(err)
@@ -108,14 +157,14 @@ func TestBucketClient_GetObject(t *testing.T) {
 	}
 
 	// Get folder
-	resp, err := client.GetObject("new folder/", nil)
+	resp, err := client.GetObject("newfolder/", nil)
 	if resp.Status != "200 OK" {
 		t.Error(err)
 	}
 
 	// Get non-existent key
 	resp, err = client.GetObject("NoSuchKey", nil)
-	if opErr, ok := err.(*OpError); ok && opErr.Code != "NoSuchKey" {
+	if opErr := checkErr(err); opErr.Code != "NoSuchKey" {
 		t.Error(err)
 	}
 
@@ -137,7 +186,7 @@ func TestBucketClient_GetObject(t *testing.T) {
 		Range: "XXX",
 	}
 	resp, err = client.GetObject(filesname[0], opt)
-	if opErr, ok := err.(*OpError); ok && opErr.Code != "InvalidRange" {
+	if opErr := checkErr(err); opErr.Code != "InvalidRange" {
 		t.Error(err)
 	}
 
@@ -146,7 +195,7 @@ func TestBucketClient_GetObject(t *testing.T) {
 		IfModifiedSince: "2018-05-29T05:55:46.000Z",
 	}
 	resp, err = client.GetObject(filesname[0], opt)
-	if opErr, ok := err.(*OpError); ok && opErr.Message != "The If-Modified-Since you specified is not valid" {
+	if opErr := checkErr(err); opErr.Message != "The If-Modified-Since you specified is not valid" {
 		t.Error(err)
 	}
 }
@@ -164,8 +213,8 @@ func TestBucketClient_HeadObject(t *testing.T) {
 		}
 
 		_, err = client.HeadObject(filename, &ObjectHeadOptions{IfModifiedSince: "0"})
-		if opErr, ok := err.(*OpError); ok && opErr.Message != "NotModified" {
-			t.Error(opErr)
+		if opErr := checkErr(err); opErr.Message != "NotModified" {
+			t.Error(err)
 		}
 
 		//err = DownloadToLocal(client, filename, "files", filename)
@@ -180,23 +229,23 @@ func TestBucketClient_HeadObject(t *testing.T) {
 	}
 
 	_, err = client.HeadObject("files/" + filesname[0], &ObjectHeadOptions{IfModifiedSince: "0"})
-	if opErr, ok := err.(*OpError); ok && opErr.Message != "NotModified" {
-		t.Error(opErr)
+	if opErr := checkErr(err); opErr.Message != "NotModified" {
+		t.Error(err)
 	}
 
-	_, err = client.HeadObject("new folder/", nil)
+	_, err = client.HeadObject("newfolder/", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = client.HeadObject("new folder/", &ObjectHeadOptions{IfModifiedSince: "0"})
-	if opErr, ok := err.(*OpError); ok && opErr.Message != "NotModified" {
-		t.Error(opErr)
+	_, err = client.HeadObject("newfolder/", &ObjectHeadOptions{IfModifiedSince: "0"})
+	if opErr := checkErr(err); opErr.Message != "NotModified" {
+		t.Error(err)
 	}
 
 	_, err = client.HeadObject("nothisobject", nil)
-	if opErr, ok := err.(*OpError); ok && opErr.Message != "NoSuchObject" {
-		t.Error(opErr)
+	if opErr := checkErr(err); opErr.Message != "NoSuchObject" {
+		t.Error(err)
 	}
 }
 
@@ -207,7 +256,7 @@ func TestBucketClient_DeleteObject(t *testing.T) {
 	}
 
 	err = client.Delete()
-	if opErr, ok := err.(*OpError); ok && opErr.Message != "BucketNotEmpty" {
+	if opErr := checkErr(err); opErr.Message != "BucketNotEmpty" {
 		t.Error(err)
 	}
 
@@ -223,7 +272,17 @@ func TestBucketClient_DeleteObject(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = client.DeleteObject("new folder/")
+	err = client.DeleteObject("files/")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = client.DeleteObject("newfolder/rename.go")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = client.DeleteObject("newfolder/")
 	if err != nil {
 		t.Error(err)
 	}

@@ -54,7 +54,7 @@ func TestCreateAuthorizationClient(t *testing.T) {
 				t.Error(err)
 			}
 		case 4:
-			if opErr, ok := err.(*OpError); ok && opErr.Code != "SignatureDoesNotMatch" {
+			if opErr := checkErr(err); opErr.Code != "SignatureDoesNotMatch" {
 				t.Error(err)
 			}
 		default:
@@ -75,7 +75,7 @@ func TestAuthorizationClient_ListBuckets(t *testing.T) {
 	} else if authorizationClient != nil {
 		buckets, err := authorizationClient.ListBuckets()
 		for _, bucket := range buckets {
-			t.Logf("Bucket: %#v\n", bucket)
+			t.Logf("Bucket: %+v\n", bucket)
 		}
 		if err != nil {
 			t.Error(err)

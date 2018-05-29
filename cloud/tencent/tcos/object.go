@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"fmt"
+	"regexp"
 	"errors"
 
 	"github.com/mozillazg/go-cos"
@@ -23,14 +24,17 @@ import (
 // e.g. Object{Key:"text.txt", ETag:"\"847f4281d3e9ad10844ef37da835cfc0\"", Size:4545, PartNumber:0, LastModified:"2018-05-22T14:39:23.000Z", StorageClass:"STANDARD", Owner:(*cos.Owner)(0xc42018bb00)}
 type Object = cos.Object
 
+// ObjectCopyResult ...
+type ObjectCopyResult = cos.ObjectCopyResult
+
 // ObjectPutOptions contains ACLHeaderOptions and ObjectPutHeaderOptions
 // details see https://intl.cloud.tencent.com/document/product/436/7749#request-header
 type ObjectPutOptions = cos.ObjectPutOptions
 
-// ACLHeaderOptions ...
+// ACLHeaderOptions see Permission-related headers in https://intl.cloud.tencent.com/document/product/436/7749#non-common-header
 type ACLHeaderOptions = cos.ACLHeaderOptions
 
-// ObjectPutHeaderOptions ...
+// ObjectPutHeaderOptions see Recommended Header in https://intl.cloud.tencent.com/document/product/436/7749#non-common-header
 type ObjectPutHeaderOptions = cos.ObjectPutHeaderOptions
 
 // ObjectGetOptions is used for GetObject()
@@ -39,6 +43,12 @@ type ObjectGetOptions = cos.ObjectGetOptions
 
 // ObjectHeadOptions specified "IfModifiedSince" Header
 type ObjectHeadOptions = cos.ObjectHeadOptions
+
+// ObjectCopyOptions contains ObjectCopyHeaderOptions and ACLHeaderOptions
+type ObjectCopyOptions = cos.ObjectCopyOptions
+
+// ObjectCopyHeaderOptions see https://cloud.tencent.com/document/product/436/10881#.E9.9D.9E.E5.85.AC.E5.85.B1.E5.A4.B4.E9.83.A8
+type ObjectCopyHeaderOptions = cos.ObjectCopyHeaderOptions
 
 // GetObject ...
 func (c *BucketClient) GetObject(objectKey string, opt *ObjectGetOptions) (*http.Response, error) {
@@ -58,21 +68,114 @@ func (c *BucketClient) GetObject(objectKey string, opt *ObjectGetOptions) (*http
 }
 
 // PutObject to bucket. This action requires WRITE permission for the Bucket.
-func (c *BucketClient) PutObject(objectKey string, reader io.Reader, opt *ObjectPutOptions) error {
+// enable force will overwrite object if ObjectAlreadyExists
+func (c *BucketClient) PutObject(objectKey string, reader io.Reader, force bool, opt *ObjectPutOptions) (*http.Response, error) {
 	if objectKey == "" {
-		return errors.New("empty objectKey")
+		return nil, errors.New("empty objectKey")
+	}
+	// TODO: test object unvalid key
+	if reg, err := regexp.MatchString(`[\^|\&|\/|\||\s]`, objectKey); reg == true && err != nil {
+		return nil, errors.New("objectKey cannot contain any ^&/| or whitespace")
 	}
 
-	_, err := c.Client.Object.Put(context.Background(), objectKey, reader, opt)
+	_, err := c.GetObject(objectKey, nil)
+	if err == nil && !force {
+		return nil, errors.New("ObjectAlreadyExists(enable force if you want to overwrite)")
+	}
+
+	if dir, _ := filepath.Split(objectKey); dir != "" {
+		if resp, err := c.Client.Object.Put(context.Background(), dir, nil, nil); err != nil {
+			if resp != nil {
+				return resp.Response, err
+			}
+			return nil, err
+		}
+	}
+
+	resp, err := c.Client.Object.Put(context.Background(), objectKey, reader, opt)
 	if err != nil {
-		return err
+		if resp != nil {
+			return resp.Response, err
+		}
+		return nil, err
 	}
 
 	if isLog {
 		log.Printf("Put object \"%s\" in bucket \"%s\"\n", objectKey, c.Name)
 	}
 
-	return nil
+	return resp.Response, nil
+}
+
+// Copy sourceKey to destKey.
+// Enable force will overwrite file if filename is the same.
+// This action can be used to copy, move, rename and reset object
+func (c *BucketClient) Copy(sourceKey, destKey string, force bool, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
+	if sourceKey == "" || destKey == "" {
+		return nil, nil, errors.New("empty key")
+	}
+
+	_, err := c.GetObject(sourceKey, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, sourceName := filepath.Split(sourceKey)
+	_, destName := filepath.Split(destKey)
+	_, err = c.GetObject(destKey, nil)
+	if err == nil && sourceName == destName && !force {
+		return nil, nil, errors.New("ObjectAlreadyExists(enable force if you still want to copy)")
+	}
+
+	// NOTICE: sourceURL is Host/path/file, no Scheme, e.g. <sourcebucket-appid>.cos.<region>.myqcloud/sourcekey
+	sourceURL := fmt.Sprintf("%s/%s", c.Client.BaseURL.BucketURL.Host, sourceKey)
+	res, resp, err := c.Client.Object.Copy(context.Background(), destKey, sourceURL, opt)
+	if err != nil {
+		return res, resp.Response, err
+	}
+
+	return res, resp.Response, nil
+}
+
+// Move object
+func (c *BucketClient) Move(sourceKey, destKey string, force bool, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
+	res, resp, err := c.Copy(sourceKey, destKey, force, opt)
+	if err != nil {
+		return res, resp, err
+	}
+
+	if err = c.DeleteObject(sourceKey); err != nil {
+		return res, resp, err
+	}
+
+	return res, resp, nil
+}
+
+// Rename object
+// TODO: Rename directory
+func (c *BucketClient) Rename(sourceKey, fileName string, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
+	// TODO: test object unvalid name
+	if reg, err := regexp.MatchString(`[\\|\^|\&|\/|\||\s]`, fileName); reg == true && err != nil {
+		return nil, nil, errors.New("filename cannot contain any \\^&/|")
+	}
+
+	path, _ := filepath.Split(sourceKey)
+	destKey := filepath.Join(path, fileName)
+	_, err := c.GetObject(destKey, nil)
+	if err == nil {
+		return nil, nil, errors.New("this action conflicts with other files")
+	}
+
+	res, resp, err := c.Copy(sourceKey, destKey, false, opt)
+	if err != nil {
+		return res, resp, err
+	}
+
+	if err = c.DeleteObject(sourceKey); err != nil {
+		return res, resp, err
+	}
+
+	return res, resp, nil
 }
 
 // ListObjects is used to get all objects in bucket. This action requires READ permission for the Bucket.
@@ -120,7 +223,7 @@ func (c *BucketClient) ObjectDownloadURL(objectKey string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("https://%s-%s.cos.%s.myqcloud.com/%s", c.BucketConfig.Name, c.BucketConfig.AppID, c.BucketConfig.Region, objectKey), nil
+	return fmt.Sprintf("%s/%s", c.Client.BaseURL.BucketURL, objectKey), nil
 }
 
 // ObjectStaticURL return static url, which can be embedded in website
@@ -155,7 +258,10 @@ func (c *BucketClient) HeadObject(objectKey string, opt *ObjectHeadOptions) (*ht
 		}
 	}
 	if err != nil {
-		return resp.Response, err
+		if resp != nil {
+			return resp.Response, err
+		}
+		return nil, err
 	}
 
 	return resp.Response, nil

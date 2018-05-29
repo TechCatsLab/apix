@@ -41,7 +41,7 @@ func TestPutBucket(t *testing.T) {
 		XCosACL: "XXXXXXXXXXX",
 	}
 	_, err := PutBucket(configs[0], opt)
-	if opErr, ok := err.(*OpError); (ok && opErr.Code != "InvalidArgument") || !ok {
+	if opErr := checkErr(err); opErr.Code != "InvalidArgument" {
 		t.Error(err)
 	}
 
@@ -57,11 +57,11 @@ func TestPutBucket(t *testing.T) {
 				t.Error(err)
 			}
 		case 3:
-			if opErr, ok := err.(*OpError); (ok && opErr.Code != "InvalidURI") || !ok {
+			if opErr := checkErr(err); opErr.Code != "InvalidURI" {
 				t.Error(err)
 			}
 		case 2, 4:
-			if dnsErr, ok := err.(*OpError); (ok && dnsErr.Code != "no such host") || !ok {
+			if opErr := checkErr(err); opErr.Code != "no such host" {
 				t.Error(err)
 			}
 		case 5:
@@ -129,7 +129,7 @@ func TestCreateBucketClient(t *testing.T) {
 				t.Error(err)
 			}
 		case 3:
-			if opErr, ok := err.(*OpError); ok && opErr.Code != "InvalidAccessKeyId" {
+			if opErr := checkErr(err); opErr.Code != "InvalidAccessKeyId" {
 				t.Error(err)
 			}
 		case 4, 5:
@@ -141,7 +141,7 @@ func TestCreateBucketClient(t *testing.T) {
 				t.Error(err)
 			}
 		case 7:
-			if opErr, ok := err.(*OpError); ok && opErr.Code != "no such host" {
+			if opErr := checkErr(err); opErr.Code != "no such host" {
 				t.Error(err)
 			}
 		default:
@@ -192,12 +192,12 @@ func TestBucketClient_Delete(t *testing.T) {
 			if err.Error() != "empty app ID" {
 				t.Error(err)
 			}
-		 case 2:
-		 	if opErr, ok := err.(*OpError); ok && opErr.Code != "InvalidAccessKeyId" {
-		 		t.Error(err)
-		 	}
+		case 2:
+			if opErr := checkErr(err); opErr.Code != "InvalidAccessKeyId" {
+				t.Error(err)
+			}
 		case 3:
-			if opErr, ok := err.(*OpError); ok && opErr.Message != "NoSuchBucket" {
+			if opErr := checkErr(err); opErr.Message != "NoSuchBucket" {
 				t.Error(err)
 			}
 		default:
@@ -218,4 +218,13 @@ func randNewStr(length int) string {
 	}
 
 	return string(data)
+}
+
+func checkErr(err error) *OpError {
+	switch v := err.(type) {
+	case *OpError:
+		return v
+	default:
+		return &OpError{Err: err}
+	}
 }
