@@ -13,11 +13,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-
 	"fmt"
+	"errors"
 
 	"github.com/mozillazg/go-cos"
-	"github.com/pkg/errors"
 )
 
 // Object contains Key, ETag, Size, PartNumber, LastModified, StorageClass, Owner of created object
@@ -40,6 +39,23 @@ type ObjectGetOptions = cos.ObjectGetOptions
 
 // ObjectHeadOptions specified "IfModifiedSince" Header
 type ObjectHeadOptions = cos.ObjectHeadOptions
+
+// GetObject ...
+func (c *BucketClient) GetObject(objectKey string, opt *ObjectGetOptions) (*http.Response, error) {
+	if objectKey == "" {
+		return nil, errors.New("empty objectKey")
+	}
+
+	resp, err := c.Client.Object.Get(context.Background(), objectKey, opt)
+	if err != nil {
+		if opErr, ok := ErrConvert(err); ok {
+			return resp.Response, opErr
+		}
+		return resp.Response, err
+	}
+
+	return resp.Response, nil
+}
 
 // PutObject to bucket. This action requires WRITE permission for the Bucket.
 func (c *BucketClient) PutObject(objectKey string, reader io.Reader, opt *ObjectPutOptions) error {
@@ -93,23 +109,6 @@ func (c *BucketClient) DeleteObject(objectKey string) error {
 	return nil
 }
 
-// GetObject ...
-func (c *BucketClient) GetObject(objectKey string, opt *ObjectGetOptions) (*http.Response, error) {
-	if objectKey == "" {
-		return nil, errors.New("empty objectKey")
-	}
-
-	resp, err := c.Client.Object.Get(context.Background(), objectKey, opt)
-	if err != nil {
-		if opErr, ok := ErrConvert(err); ok {
-			return nil, opErr
-		}
-		return nil, err
-	}
-
-	return resp.Response, nil
-}
-
 // ObjectDownloadURL ...
 func (c *BucketClient) ObjectDownloadURL(objectKey string) (string, error) {
 	if objectKey == "" {
@@ -124,27 +123,42 @@ func (c *BucketClient) ObjectDownloadURL(objectKey string) (string, error) {
 	return fmt.Sprintf("https://%s-%s.cos.%s.myqcloud.com/%s", c.BucketConfig.Name, c.BucketConfig.AppID, c.BucketConfig.Region, objectKey), nil
 }
 
+// ObjectStaticURL return static url, which can be embedded in website
+// NOTICE: This action need enable static website in basicconfig of bucket
+func (c *BucketClient) ObjectStaticURL(objectKey string) (string, error) {
+	if objectKey == "" {
+		return "", errors.New("empty objectKey")
+	}
+
+	_, err := c.GetObject(objectKey, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("https://%s-%s.cos-website.%s.myqcloud.com/%s", c.BucketConfig.Name, c.BucketConfig.AppID, c.BucketConfig.Region, objectKey), nil
+}
+
 // HeadObject requests object meta info.
 // if opt specified "IfModifiedSince" Header and object is not modified, response 304
-func (c *BucketClient) HeadObject(objectKey string, opt *ObjectHeadOptions) error {
+func (c *BucketClient) HeadObject(objectKey string, opt *ObjectHeadOptions) (*http.Response, error) {
 	if objectKey == "" {
-		return errors.New("empty objectKey")
+		return nil, errors.New("empty objectKey")
 	}
 
 	resp, err := c.Client.Object.Head(context.Background(), objectKey, opt)
 	if resp != nil {
 		switch resp.StatusCode {
 		case 404:
-			return &OpError{"404", "NoSuchObject", err}
+			return resp.Response, &OpError{"404", "NoSuchObject", err}
 		case 304:
-			return &OpError{"304", "NotModified", err}
+			return resp.Response, &OpError{"304", "NotModified", err}
 		}
 	}
 	if err != nil {
-		return err
+		return resp.Response, err
 	}
 
-	return nil
+	return resp.Response, nil
 }
 
 // DownloadObject ...
@@ -175,12 +189,12 @@ func DownloadToLocal(client *BucketClient, objectKey, localPath, filename string
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
 	if err != nil {
 		log.Fatalln("read resp body err: ", err)
 
 		return err
 	}
-	defer resp.Body.Close()
 
 	if err = checkPath(localPath); err != nil {
 		log.Fatalln(err)

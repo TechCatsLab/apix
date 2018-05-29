@@ -71,7 +71,7 @@ func TestAuthorizationClient_ListBuckets(t *testing.T) {
 	}}
 
 	if authorizationClient, err := CreateAuthorizationClient(configs[0]); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	} else if authorizationClient != nil {
 		buckets, err := authorizationClient.ListBuckets()
 		for _, bucket := range buckets {
@@ -94,7 +94,7 @@ func TestAuthorizationClient_CreateBucketClient(t *testing.T) {
 	}
 
 	if authorizationClient, err := CreateAuthorizationClient(*config); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	} else if authorizationClient != nil {
 		buckets, err := authorizationClient.ListBuckets()
 		if err != nil {
@@ -107,5 +107,14 @@ func TestAuthorizationClient_CreateBucketClient(t *testing.T) {
 				t.Error(err)
 			}
 		}
+	}
+
+	client, err := CreateBucketClient(*bucketConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Delete()
+	if err != nil {
+		t.Error(err)
 	}
 }

@@ -151,7 +151,7 @@ func CreateBucketClient(config BucketConfig) (*BucketClient, error) {
 func (c *BucketClient) Delete() error {
 	resp, err := c.Client.Bucket.Delete(context.Background())
 	if resp != nil && resp.StatusCode == 409 {
-		return errors.New("BucketNotEmpty")
+		return &OpError{"", "BucketNotEmpty", errors.New("please remove all files before delete bucket")}
 	}
 	if resp != nil && resp.StatusCode == 403 {
 		return errors.New("AccessDenied")
