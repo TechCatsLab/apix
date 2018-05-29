@@ -22,7 +22,7 @@ func main() {
 	ep.AttachMiddleware(middleware.NegroniRecoverHandler())
 	ep.AttachMiddleware(middleware.NegroniLoggerHandler())
 	ep.AttachMiddleware(middleware.NegroniCorsAllowAll())
-	ep.AttachMiddleware(middleware.NegroniJwtHandler(privateTokenKey, skiper, nil, jwtErrHandler))
+	ep.AttachMiddleware(middleware.NegroniJwtHandler(privateTokenKey, skipper, nil, jwtErrHandler))
 
 	router := server.NewRouter()
 	router.Get("/", handle)
@@ -53,7 +53,7 @@ func handle(ctx *server.Context) error {
 	return nil
 }
 
-func skiper(path string) bool {
+func skipper(path string) bool {
 	if path == "/skipper" {
 		return true
 	}

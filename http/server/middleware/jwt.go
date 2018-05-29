@@ -17,13 +17,13 @@ type Skipper func(path string) bool
 // JWTMiddleware is a wrapper of go-jwt-middleware, but added a skipper func on it.
 type JWTMiddleware struct {
 	*jwtmiddleware.JWTMiddleware
-	skiper Skipper
+	skipper Skipper
 }
 
 // handler runs HandlerWithNext func after skipper
 func (jm *JWTMiddleware) handler(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	path := r.URL.Path
-	if skip := jm.skiper(path); skip {
+	if skip := jm.skipper(path); skip {
 		next(w, r)
 		return
 	}
