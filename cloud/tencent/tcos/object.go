@@ -61,7 +61,10 @@ func (c *BucketClient) GetObject(objectKey string, opt *ObjectGetOptions) (*http
 		if opErr, ok := ErrConvert(err); ok {
 			return resp.Response, opErr
 		}
-		return resp.Response, err
+		if resp != nil {
+			return resp.Response, err
+		}
+		return nil, err
 	}
 
 	return resp.Response, nil
@@ -108,7 +111,7 @@ func (c *BucketClient) PutObject(objectKey string, reader io.Reader, force bool,
 }
 
 // Copy sourceKey to destKey.
-// Enable force will overwrite file if filename is the same.
+// Enable force will overwrite file if destKey exists.
 // This action can be used to copy, move, rename and reset object
 func (c *BucketClient) Copy(sourceKey, destKey string, force bool, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
 	if sourceKey == "" || destKey == "" {
@@ -131,7 +134,45 @@ func (c *BucketClient) Copy(sourceKey, destKey string, force bool, opt *ObjectCo
 	sourceURL := fmt.Sprintf("%s/%s", c.Client.BaseURL.BucketURL.Host, sourceKey)
 	res, resp, err := c.Client.Object.Copy(context.Background(), destKey, sourceURL, opt)
 	if err != nil {
-		return res, resp.Response, err
+		if resp != nil {
+			return res, resp.Response, err
+		}
+		return res, nil, err
+	}
+
+	if isLog {
+		log.Printf("Copy object \"%s\" to \"%s\" in bucket \"%s\"\n", sourceKey, destKey, c.Name)
+	}
+
+	return res, resp.Response, nil
+}
+
+// Copy ...
+func Copy(client *BucketClient, sourceKey, destKey string, force bool, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
+	if sourceKey == "" || destKey == "" {
+		return nil, nil, errors.New("empty key")
+	}
+
+	_, err := client.GetObject(sourceKey, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, sourceName := filepath.Split(sourceKey)
+	_, destName := filepath.Split(destKey)
+	_, err = client.GetObject(destKey, nil)
+	if err == nil && sourceName == destName && !force {
+		return nil, nil, errors.New("ObjectAlreadyExists(enable force if you still want to copy)")
+	}
+
+	// NOTICE: sourceURL is Host/path/file, no Scheme, e.g. <sourcebucket-appid>.cos.<region>.myqcloud/sourcekey
+	sourceURL := fmt.Sprintf("%s/%s", client.Client.BaseURL.BucketURL.Host, sourceKey)
+	res, resp, err := client.Client.Object.Copy(context.Background(), destKey, sourceURL, opt)
+	if err != nil {
+		if resp != nil {
+			return res, resp.Response, err
+		}
+		return res, nil, err
 	}
 
 	return res, resp.Response, nil
@@ -139,13 +180,18 @@ func (c *BucketClient) Copy(sourceKey, destKey string, force bool, opt *ObjectCo
 
 // Move object
 func (c *BucketClient) Move(sourceKey, destKey string, force bool, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
-	res, resp, err := c.Copy(sourceKey, destKey, force, opt)
+	res, resp, err := Copy(c, sourceKey, destKey, force, opt)
 	if err != nil {
 		return res, resp, err
 	}
 
-	if err = c.DeleteObject(sourceKey); err != nil {
-		return res, resp, err
+	_, err = c.Client.Object.Delete(context.Background(), sourceKey)
+	if err != nil {
+		return res, resp, &OpError{"Move with err", "delete sourceKey failed", err}
+	}
+
+	if isLog {
+		log.Printf("Move object \"%s\" to \"%s\" in bucket \"%s\"\n", sourceKey, destKey, c.Name)
 	}
 
 	return res, resp, nil
@@ -156,7 +202,7 @@ func (c *BucketClient) Move(sourceKey, destKey string, force bool, opt *ObjectCo
 func (c *BucketClient) Rename(sourceKey, fileName string, opt *ObjectCopyOptions) (*ObjectCopyResult, *http.Response, error) {
 	// TODO: test object unvalid name
 	if reg, err := regexp.MatchString(`[\\|\^|\&|\/|\||\s]`, fileName); reg == true && err != nil {
-		return nil, nil, errors.New("filename cannot contain any \\^&/|")
+		return nil, nil, errors.New("filename cannot contain any \\^&/| or whitespace")
 	}
 
 	path, _ := filepath.Split(sourceKey)
@@ -166,13 +212,18 @@ func (c *BucketClient) Rename(sourceKey, fileName string, opt *ObjectCopyOptions
 		return nil, nil, errors.New("this action conflicts with other files")
 	}
 
-	res, resp, err := c.Copy(sourceKey, destKey, false, opt)
+	res, resp, err := Copy(c, sourceKey, destKey, false, opt)
 	if err != nil {
 		return res, resp, err
 	}
 
-	if err = c.DeleteObject(sourceKey); err != nil {
-		return res, resp, err
+	_, err = c.Client.Object.Delete(context.Background(), sourceKey)
+	if err != nil {
+		return res, resp, &OpError{"Rename with err", "delete sourceKey failed", err}
+	}
+
+	if isLog {
+		log.Printf("Rename object \"%s\" to \"%s\" in bucket \"%s\"\n", sourceKey, destKey, c.Name)
 	}
 
 	return res, resp, nil
@@ -194,7 +245,7 @@ func (c *BucketClient) ListObjects(opt *BucketGetOptions) ([]Object, error) {
 }
 
 // DeleteObject is used to delete one file (Object) in Bucket. This action requires WRITE permission for the Bucket.
-// if the named object doesn't exit, delete operation is ok and return 204 - No Content
+// if the named object doesn't exist, delete operation is ok and return 204 - No Content
 func (c *BucketClient) DeleteObject(objectKey string) error {
 	if objectKey == "" {
 		return errors.New("empty objectKey")
@@ -318,7 +369,7 @@ func DownloadToLocal(client *BucketClient, objectKey, localPath, filename string
 	return nil
 }
 
-// CheckPath is used to create directory if the path doesn't exit
+// CheckPath is used to create directory if the path doesn't exist
 func checkPath(path string) error {
 	_, err := os.Stat(path)
 

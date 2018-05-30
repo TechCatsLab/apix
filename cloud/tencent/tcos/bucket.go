@@ -42,6 +42,19 @@ type BucketGetOptions = cos.BucketGetOptions
 // BucketPutOptions in https://intl.cloud.tencent.com/document/product/436/7738#request-header
 type BucketPutOptions = cos.BucketPutOptions
 
+// BucketPutCORSOptions contains XMLName and BucketCORSRule
+// details see https://intl.cloud.tencent.com/document/product/436/8279#request-body
+type BucketPutCORSOptions = cos.BucketPutCORSOptions
+
+// BucketCORSRule :
+// ID             string   `xml:"ID,omitempty"`
+// AllowedMethods []string `xml:"AllowedMethod"`
+// AllowedOrigins []string `xml:"AllowedOrigin"`
+// AllowedHeaders []string `xml:"AllowedHeader,omitempty"`
+// MaxAgeSeconds  int      `xml:"MaxAgeSeconds,omitempty"`
+// ExposeHeaders  []string `xml:"ExposeHeader,omitempty"`
+type BucketCORSRule = cos.BucketCORSRule
+
 // PutBucket is used to create a new bucket.
 // options: https://intl.cloud.tencent.com/document/product/436/7738#request-header
 func PutBucket(config BucketConfig, options *BucketPutOptions) (*BucketClient, error) {
@@ -106,10 +119,10 @@ func CreateBucketClient(config BucketConfig) (*BucketClient, error) {
 		return nil, err
 	}
 	if config.Name == "" {
-		return nil, errors.New("bucket name is needed but none exits")
+		return nil, errors.New("bucket name is needed but none exists")
 	}
 	if config.Region == "" {
-		return nil, errors.New("bucket region is needed but none exits")
+		return nil, errors.New("bucket region is needed but none exists")
 	}
 
 	c := &BucketClient{
@@ -145,6 +158,30 @@ func CreateBucketClient(config BucketConfig) (*BucketClient, error) {
 	}
 
 	return c, nil
+}
+
+// PutCORS config
+func (c *BucketClient) PutCORS(opt *BucketPutCORSOptions) error {
+	if opt == nil {
+		return errors.New("400 InvalidArgument")
+	}
+
+	_, err := c.Client.Bucket.PutCORS(context.Background(), opt)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetCORS output CORS of basic-config in bucket
+func (c *BucketClient) GetCORS() ([]BucketCORSRule, error) {
+	v, _, err := c.Client.Bucket.GetCORS(context.Background())
+	if err != nil {
+		return []BucketCORSRule{}, err
+	}
+
+	return v.Rules, nil
 }
 
 // Delete the bucket. The bucket must be empty before deleting.

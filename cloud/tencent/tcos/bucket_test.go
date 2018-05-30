@@ -133,11 +133,11 @@ func TestCreateBucketClient(t *testing.T) {
 				t.Error(err)
 			}
 		case 4, 5:
-			if err.Error() != "bucket name is needed but none exits" {
+			if err.Error() != "bucket name is needed but none exists" {
 				t.Error(err)
 			}
 		case 6:
-			if err.Error() != "bucket region is needed but none exits" {
+			if err.Error() != "bucket region is needed but none exists" {
 				t.Error(err)
 			}
 		case 7:
@@ -147,6 +147,75 @@ func TestCreateBucketClient(t *testing.T) {
 		default:
 			t.Error(i, err)
 		}
+	}
+}
+
+func TestBucketClient_PutCORS(t *testing.T) {
+	var config = &BucketConfig{
+		AuthorizationConfig: &AuthorizationConfig{
+			AppID:     APPID,
+			SecretID:  SID,
+			SecretKey: SKEY,
+		},
+		Name:   testBucketName,
+		Region: "ap-shanghai",
+	}
+
+	client, err := CreateBucketClient(*config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = client.PutCORS(nil)
+	if err.Error() != "400 InvalidArgument" {
+		t.Error(err)
+	}
+
+	opt := &BucketPutCORSOptions{
+		Rules: []BucketCORSRule{
+			{
+				AllowedOrigins: []string{"http://www.qq.com"},
+				AllowedMethods: []string{"PUT", "GET"},
+				AllowedHeaders: []string{"x-cos-meta-test", "x-cos-xx"},
+				MaxAgeSeconds:  500,
+				ExposeHeaders:  []string{"x-cos-meta-test1"},
+			},
+			{
+				ID:             "1234",
+				AllowedOrigins: []string{"http://www.google.com", "twitter.com"},
+				AllowedMethods: []string{"PUT", "GET"},
+				MaxAgeSeconds:  500,
+			},
+		},
+	}
+	err = client.PutCORS(opt)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestBucketClient_GetCORS(t *testing.T) {
+	var config = &BucketConfig{
+		AuthorizationConfig: &AuthorizationConfig{
+			AppID:     APPID,
+			SecretID:  SID,
+			SecretKey: SKEY,
+		},
+		Name:   testBucketName,
+		Region: "ap-shanghai",
+	}
+
+	client, err := CreateBucketClient(*config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rules, err := client.GetCORS()
+	if err != nil {
+		t.Error(err)
+	}
+	for _, r := range rules {
+		t.Logf("CORS: %+v\n", r)
 	}
 }
 
@@ -182,7 +251,7 @@ func TestBucketClient_Delete(t *testing.T) {
 		switch i {
 		case 0:
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			} else if client != nil {
 				if err = client.Delete(); err != nil {
 					t.Error(err)

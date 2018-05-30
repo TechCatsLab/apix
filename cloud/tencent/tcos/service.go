@@ -97,7 +97,7 @@ func (c *AuthorizationClient) ListBuckets() ([]Bucket, error) {
 		return service.Buckets, nil
 	}
 
-	return []Bucket{}, errors.New("no bucket exits")
+	return []Bucket{}, errors.New("no bucket exists")
 }
 
 // CreateBucketClient is used to get a bucket client by AuthorizationClient
