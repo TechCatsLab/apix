@@ -1,5 +1,5 @@
 /*
- * This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com">http://www.maxmind.com</a>.
+ * This product includes GeoLite2 data created by MaxMind, available from http://www.maxmind.com.
  *
  * Revision History:
  *     Initial: 2018/06/01        Wang RiYu

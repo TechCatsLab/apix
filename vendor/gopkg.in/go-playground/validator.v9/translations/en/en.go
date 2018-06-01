@@ -69,7 +69,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 
 				var digits uint64
-				var kind reflect.Kind
 
 				if idx := strings.Index(fe.Param(), "."); idx != -1 {
 					digits = uint64(len(fe.Param()[idx+1:]))
@@ -80,12 +79,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					goto END
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -160,7 +154,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 
 				var digits uint64
-				var kind reflect.Kind
 
 				if idx := strings.Index(fe.Param(), "."); idx != -1 {
 					digits = uint64(len(fe.Param()[idx+1:]))
@@ -171,12 +164,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					goto END
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -251,7 +239,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 
 				var digits uint64
-				var kind reflect.Kind
 
 				if idx := strings.Index(fe.Param(), "."); idx != -1 {
 					digits = uint64(len(fe.Param()[idx+1:]))
@@ -262,12 +249,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					goto END
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -377,7 +359,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 				var f64 float64
 				var digits uint64
-				var kind reflect.Kind
 
 				fn := func() (err error) {
 
@@ -390,12 +371,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -429,8 +405,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 
 				case reflect.Struct:
 					if fe.Type() != reflect.TypeOf(time.Time{}) {
-						err = fmt.Errorf("tag '%s' cannot be used on a struct type", fe.Tag())
-						goto END
+						err = fmt.Errorf("tag '%s' cannot be used on a struct type.", fe.Tag())
 					}
 
 					t, err = ut.T("lt-datetime", fe.Field())
@@ -497,7 +472,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 				var f64 float64
 				var digits uint64
-				var kind reflect.Kind
 
 				fn := func() (err error) {
 
@@ -510,12 +484,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -549,8 +518,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 
 				case reflect.Struct:
 					if fe.Type() != reflect.TypeOf(time.Time{}) {
-						err = fmt.Errorf("tag '%s' cannot be used on a struct type", fe.Tag())
-						goto END
+						err = fmt.Errorf("tag '%s' cannot be used on a struct type.", fe.Tag())
 					}
 
 					t, err = ut.T("lte-datetime", fe.Field())
@@ -617,7 +585,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 				var f64 float64
 				var digits uint64
-				var kind reflect.Kind
 
 				fn := func() (err error) {
 
@@ -630,12 +597,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -669,8 +631,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 
 				case reflect.Struct:
 					if fe.Type() != reflect.TypeOf(time.Time{}) {
-						err = fmt.Errorf("tag '%s' cannot be used on a struct type", fe.Tag())
-						goto END
+						err = fmt.Errorf("tag '%s' cannot be used on a struct type.", fe.Tag())
 					}
 
 					t, err = ut.T("gt-datetime", fe.Field())
@@ -737,7 +698,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 				var t string
 				var f64 float64
 				var digits uint64
-				var kind reflect.Kind
 
 				fn := func() (err error) {
 
@@ -750,12 +710,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 					return
 				}
 
-				kind = fe.Kind()
-				if kind == reflect.Ptr {
-					kind = fe.Type().Elem().Kind()
-				}
-
-				switch kind {
+				switch fe.Kind() {
 				case reflect.String:
 
 					var c string
@@ -789,8 +744,7 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 
 				case reflect.Struct:
 					if fe.Type() != reflect.TypeOf(time.Time{}) {
-						err = fmt.Errorf("tag '%s' cannot be used on a struct type", fe.Tag())
-						goto END
+						err = fmt.Errorf("tag '%s' cannot be used on a struct type.", fe.Tag())
 					}
 
 					t, err = ut.T("gte-datetime", fe.Field())
@@ -1297,19 +1251,6 @@ func RegisterDefaultTranslations(v *validator.Validate, trans ut.Translator) (er
 			tag:         "iscolor",
 			translation: "{0} must be a valid color",
 			override:    false,
-		},
-		{
-			tag:         "oneof",
-			translation: "{0} must be one of [{1}]",
-			override:    false,
-			customTransFunc: func(ut ut.Translator, fe validator.FieldError) string {
-				s, err := ut.T(fe.Tag(), fe.Field(), fe.Param())
-				if err != nil {
-					log.Printf("warning: error translating FieldError: %#v", fe)
-					return fe.(error).Error()
-				}
-				return s
-			},
 		},
 	}
 

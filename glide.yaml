@@ -9,3 +9,5 @@ import:
 - package: github.com/auth0/go-jwt-middleware
 - package: github.com/rs/cors
   version: v1.4.0
+- package: github.com/oschwald/maxminddb-golang
+  version: ^1.3.0

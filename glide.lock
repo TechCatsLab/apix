@@ -1,12 +1,12 @@
-hash: 74385e59ba4294bcb75a6e85301758ce764b78caa699d5e9b26a050085d07f9b
-updated: 2018-05-27T16:33:39.864567+08:00
+hash: 4362b36ae7f453dd31c4c9480577d344dd32b0724eb117b99d07d80587e4dcbf
+updated: 2018-06-01T18:54:42.959699+08:00
 imports:
 - name: github.com/auth0/go-jwt-middleware
   version: 5493cabe49f7bfa6e2ec444a09d334d90cd4e2bd
 - name: github.com/dgrijalva/jwt-go
   version: 06ea1031745cb8b3dab3f6a236daf2b0aa468b7e
 - name: github.com/go-playground/locales
-  version: e4cbcb5d0652150d40ad0646651076b6bd2be4f6
+  version: f63010822830b6fe52288ee52d5a1151088ce039
   subpackages:
   - currency
 - name: github.com/go-playground/universal-translator
@@ -27,12 +27,27 @@ imports:
   - debug
 - name: github.com/mozillazg/go-httpheader
   version: fcf1e196bc6f884f5e97d5084c83feb917e15b08
+- name: github.com/oschwald/maxminddb-golang
+  version: c5bec84d1963260297932a1b7a1753c8420717a7
 - name: github.com/qiniu/api.v7
   version: 0c661d0ca96771709f67b3d9eac10f27033b1f2a
 - name: github.com/rs/cors
   version: ca016a06a5753f8ba03029c0aa5e54afb1bf713f
 - name: github.com/urfave/negroni
   version: 5dbbc83f748fc3ad38585842b0aedab546d0ea1e
+- name: golang.org/x/net
+  version: 1c05540f6879653db88113bc4a2b70aec4bd491f
+  subpackages:
+  - context
+- name: golang.org/x/sync
+  version: 1d60e4601c6fd243af51cc01ddf169918a5407ca
+  subpackages:
+  - errgroup
+- name: golang.org/x/sys
+  version: 43e60d72a8e2bd92ee98319ba9a384a0e9837c08
+  subpackages:
+  - unix
+  - windows
 - name: gopkg.in/go-playground/validator.v9
-  version: ffe836d7363bc7ab3f56d2fc90ce09bfb5a0c2c5
+  version: b1f51f36f1c98cc97f777d6fc9d4b05eaa0cabb5
 testImports: []
