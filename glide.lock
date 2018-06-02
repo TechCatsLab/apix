@@ -1,5 +1,5 @@
-hash: 4362b36ae7f453dd31c4c9480577d344dd32b0724eb117b99d07d80587e4dcbf
-updated: 2018-06-01T18:54:42.959699+08:00
+hash: 7b1eab4a0cb8fdf8c652174cf11c12fac79ce5d79d22a09ce3e15d1587a75f65
+updated: 2018-06-02T16:43:20.476263+08:00
 imports:
 - name: github.com/auth0/go-jwt-middleware
   version: 5493cabe49f7bfa6e2ec444a09d334d90cd4e2bd
@@ -31,6 +31,8 @@ imports:
   version: c5bec84d1963260297932a1b7a1753c8420717a7
 - name: github.com/qiniu/api.v7
   version: 0c661d0ca96771709f67b3d9eac10f27033b1f2a
+- name: github.com/robfig/cron
+  version: b41be1df696709bb6395fe435af20370037c0b4c
 - name: github.com/rs/cors
   version: ca016a06a5753f8ba03029c0aa5e54afb1bf713f
 - name: github.com/urfave/negroni
