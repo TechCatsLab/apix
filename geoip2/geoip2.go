@@ -26,24 +26,23 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// CityDB ...
+// CityDB download link
 const CityDB = "http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz"
 
-// AsnDB ...
+// AsnDB download link
 const AsnDB = "http://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN.tar.gz"
 
 type (
 	// Client ...
 	Client struct {
-		DBLocationDir string // DBLocationDir is used to store mmdb files
-		UserAgent     string
+		DBLocationDir string        // DBLocationDir is used to store mmdb files
 		MaxConnect    int           // max synchronously lookup
 		Timeout       time.Duration // lookup duration
 		mux           sync.RWMutex  // maintain db
 		AsnDB         *maxminddb.Reader
 		CityDB        *maxminddb.Reader
 	}
-	// Result ...
+	// Result of lookup
 	Result struct {
 		Continent struct {
 			Code  string `maxminddb:"code" json:"code"`
@@ -87,7 +86,7 @@ type (
 		} `maxminddb:"registered_country" json:"registered_country"`
 		Organization string `maxminddb:"autonomous_system_organization" json:"organization"`
 	}
-	// DBMeta metadata ...
+	// DBMeta metadata
 	DBMeta struct {
 		Version      string    `json:"version"`
 		IPVersion    string    `json:"ipVersion"`
@@ -103,7 +102,7 @@ var DefaultClient = &Client{
 	MaxConnect:    0x64,
 }
 
-// Init the database
+// Init and verify the database, if none exists, download it
 func (c *Client) Init() error {
 	var (
 		asnDBLocation  = filepath.Join(c.DBLocationDir, "GeoLite2-ASN.mmdb")
@@ -183,24 +182,21 @@ func (c *Client) Init() error {
 	return nil
 }
 
-// UpdateDB ...
+// UpdateDB when remote database update, used with cron
 func (c *Client) UpdateDB() {
-	c.mux.Lock()
-	defer func() {
-		c.mux.Unlock()
-
-		err := os.RemoveAll(strings.Join([]string{c.DBLocationDir, "download/"}, "/"))
-		if err != nil {
-			log.Println(err)
-		}
-	}()
-
 	var (
 		asnDBLocation  = filepath.Join(c.DBLocationDir, "GeoLite2-ASN.mmdb")
 		cityDBLocation = filepath.Join(c.DBLocationDir, "GeoLite2-City.mmdb")
 	)
 
 	log.Println("Update database at", time.Now().UTC().String())
+
+	defer func() {
+		err := os.RemoveAll(strings.Join([]string{c.DBLocationDir, "download/"}, "/"))
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	g := errgroup.Group{}
 	g.Go(func() error {
@@ -223,13 +219,6 @@ func (c *Client) UpdateDB() {
 		if err != nil {
 			return err
 		}
-
-		asnDB, err := maxminddb.Open(asnDBLocation)
-		if err != nil {
-			return err
-		}
-
-		c.AsnDB = asnDB
 
 		return nil
 	})
@@ -255,20 +244,30 @@ func (c *Client) UpdateDB() {
 			return err
 		}
 
-		cityDB, err := maxminddb.Open(cityDBLocation)
-		if err != nil {
-			return err
-		}
-
-		c.CityDB = cityDB
-
 		return nil
 	})
 
 	if err := g.Wait(); err != nil {
 		log.Println("Update database failed with err:", err)
+		c.UpdateDB()
+	} else {
+		c.mux.Lock()
+		asnDB, err := maxminddb.Open(asnDBLocation)
+		if err != nil {
+			log.Println(err)
+			c.UpdateDB()
+		}
+		c.AsnDB = asnDB
+		cityDB, err := maxminddb.Open(cityDBLocation)
+		if err != nil {
+			log.Println(err)
+			c.UpdateDB()
+		}
+		c.CityDB = cityDB
+		c.mux.Unlock()
+
+		log.Println("Update database complete")
 	}
-	log.Println("Update database complete")
 }
 
 // DBMeta return database metadata
@@ -330,14 +329,12 @@ func (c *Client) Lookup(ipStr string) (*Result, error) {
 	eg := &errgroup.Group{}
 
 	eg.Go(func() error {
-		asnDB := c.AsnDB
-		err := asnDB.Lookup(ip, &result)
+		err := c.AsnDB.Lookup(ip, &result)
 		if err != nil {
 			return err
 		}
 
-		cityDB := c.CityDB
-		err = cityDB.Lookup(ip, &result)
+		err = c.CityDB.Lookup(ip, &result)
 		if err != nil {
 			return err
 		}
@@ -352,6 +349,9 @@ func (c *Client) Lookup(ipStr string) (*Result, error) {
 		if err != nil {
 			return result, err
 		}
+		if result.Subdivisions == nil {
+			return result, errors.New("not found")
+		}
 		return result, nil
 	}
 }
@@ -362,8 +362,14 @@ func (c *Client) Close() error {
 		return errors.New("no database")
 	}
 
-	c.AsnDB.Close()
-	c.CityDB.Close()
+	err := c.AsnDB.Close()
+	if err != nil {
+		return err
+	}
+	err = c.CityDB.Close()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -384,7 +390,6 @@ func (c *Client) downloadMMDB(dbLink string) (string, error) {
 	}
 
 	if _, err = io.Copy(f, res.Body); err != nil {
-		os.Remove(dbFile)
 		return "", err
 	}
 	log.Printf("Download %s complete\n", dbFile)

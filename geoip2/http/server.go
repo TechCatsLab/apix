@@ -19,11 +19,14 @@ type Query struct {
 	IP string `json:"ip"`
 }
 
-// Result ...
+// Result of lookup
 type Result = geoip2.Result
 
+// DBMeta of database
+type DBMeta = geoip2.DBMeta
+
 var client = &geoip2.Client{
-	DBLocationDir: "./maxminddb",
+	DBLocationDir: "maxminddb",
 	Timeout:       time.Second * 15,
 	MaxConnect:    0x64,
 }
@@ -38,7 +41,9 @@ func main() {
 		client.Close()
 	}()
 
-	cron.AddFunc("0 30 2 * * 3", func() {
+	// at 4:30 on the first Wednesday of each month execute the func
+	// the first Tuesday is the "GeoLite2-City.mmdb" update time
+	cron.AddFunc("0 30 4 * * 3", func() {
 		client.UpdateDB()
 	})
 
@@ -63,12 +68,22 @@ func lookup(ctx *server.Context) error {
 
 	if err := ctx.JSONBody(&query); err != nil {
 		log.Println(err)
+		resp.WriteHeader(500)
+		resp.Write([]byte(err.Error()))
+
 		return err
 	}
 
 	result, err := client.Lookup(query.IP)
 	if err != nil {
 		log.Println(err)
+		if err.Error() == "not found" {
+			resp.WriteHeader(404)
+		} else {
+			resp.WriteHeader(500)
+		}
+		resp.Write([]byte(err.Error()))
+
 		return err
 	}
 
@@ -79,9 +94,22 @@ func lookup(ctx *server.Context) error {
 }
 
 func getMeta(ctx *server.Context) error {
-	res := ctx.Response()
-	res.WriteHeader(200)
-	res.Write([]byte("hello world! \n"))
+	var (
+		resp = ctx.Response()
+		meta []DBMeta
+	)
+
+	meta, err := client.DBMeta()
+	if err != nil {
+		log.Println(err)
+		resp.WriteHeader(500)
+		resp.Write([]byte(err.Error()))
+
+		return err
+	}
+
+	resp.WriteHeader(200)
+	ctx.ServeJSON(&meta)
 
 	return nil
 }

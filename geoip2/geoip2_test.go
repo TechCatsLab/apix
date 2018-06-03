@@ -6,10 +6,10 @@
 package geoip2
 
 import (
-	"testing"
-	"sync"
-	"time"
 	"log"
+	"sync"
+	"testing"
+	"time"
 
 	"github.com/robfig/cron"
 )
@@ -86,9 +86,9 @@ func TestClient_UpdateDB(t *testing.T) {
 		client.UpdateDB()
 	})
 
-	// at 2:30 on the first Wednesday of each month execute the func
+	// at 4:30 on the first Wednesday of each month execute the func
 	// the first Tuesday is the "GeoLite2-City.mmdb" update time
-	cron.AddFunc("0 30 2 * * 3", func() {
+	cron.AddFunc("0 30 4 * * 3", func() {
 		log.Println(time.Now().UTC().String())
 		client.UpdateDB()
 	})
