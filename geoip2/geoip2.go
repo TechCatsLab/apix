@@ -251,18 +251,18 @@ func (c *Client) UpdateDB() {
 		log.Println("Update database failed with err:", err)
 		c.UpdateDB()
 	} else {
-		c.mux.Lock()
 		asnDB, err := maxminddb.Open(asnDBLocation)
 		if err != nil {
 			log.Println(err)
 			c.UpdateDB()
 		}
-		c.AsnDB = asnDB
 		cityDB, err := maxminddb.Open(cityDBLocation)
 		if err != nil {
 			log.Println(err)
 			c.UpdateDB()
 		}
+		c.mux.Lock()
+		c.AsnDB = asnDB
 		c.CityDB = cityDB
 		c.mux.Unlock()
 
