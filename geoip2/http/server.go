@@ -32,13 +32,21 @@ var client = &geoip2.Client{
 }
 
 func main() {
-	client.Init()
 	cron := cron.New()
+	err := client.Init()
+	if err != nil {
+		log.Println(err)
+
+		return
+	}
 
 	cron.Start()
 	defer func() {
 		cron.Stop()
-		client.Close()
+
+		if err := client.Close(); err != nil {
+			log.Println(err)
+		}
 	}()
 
 	// at 4:30 on the first Wednesday of each month execute the func
@@ -76,10 +84,11 @@ func lookup(ctx *server.Context) error {
 
 	result, err := client.Lookup(query.IP)
 	if err != nil {
-		log.Println(err)
 		if err.Error() == "not found" {
+			log.Println("not found " + query.IP)
 			resp.WriteHeader(404)
 		} else {
+			log.Println(err)
 			resp.WriteHeader(500)
 		}
 		resp.Write([]byte(err.Error()))
