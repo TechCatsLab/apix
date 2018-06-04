@@ -176,9 +176,11 @@ func (c *Client) Init() error {
 	})
 
 	if err := g.Wait(); err != nil {
+		log.Println("initialization faild with err:", err)
 		return err
 	}
 
+	log.Println("initialization complete")
 	return nil
 }
 
@@ -310,7 +312,7 @@ func (c *Client) Lookup(ipStr string) (*Result, error) {
 	}()
 
 	if c.MaxConnect < 0 {
-		return nil, errors.New("no more lookup operation")
+		return nil, errors.New("no more lookup operation for now, wait a minute")
 	}
 
 	var (
