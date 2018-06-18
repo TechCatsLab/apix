@@ -10,9 +10,15 @@ import (
 	"net/http"
 )
 
+const (
+	HeaderAuthorization = "Authorization"
+
+	AuthSchemeBearer = "Bearer"
+)
+
 // A Request represents an HTTP request to be sent by a client.
 type Request struct {
-	*http.Request
+	HTTPRequest *http.Request
 }
 
 // NewRequest returns a new Request given a method, URL, and optional body.
@@ -28,29 +34,34 @@ func NewRequest(method, url string, body io.Reader) (*Request, error) {
 // AddHeader adds the key, value pair to the header.
 // It appends to any existing values associated with key.
 func (r *Request) AddHeader(key, value string) {
-	r.Header.Add(key, value)
+	r.HTTPRequest.Header.Add(key, value)
 }
 
 // AddHeaders adds the multiple headers.
 func (r *Request) AddHeaders(headers map[string]string) {
 	for key, value := range headers {
-		r.Header.Add(key, value)
+		r.HTTPRequest.Header.Add(key, value)
 	}
 }
 
 // DelHeader deletes the values associated with key.
 func (r *Request) DelHeader(key string) {
-	r.Header.Del(key)
+	r.HTTPRequest.Header.Del(key)
 }
 
 // GetHeader gets the first value associated with the given key.
 // If there are no values associated with the key, Get returns "".
 func (r *Request) GetHeader(key, value string) string {
-	return r.Header.Get(key)
+	return r.HTTPRequest.Header.Get(key)
 }
 
 // SetHeader sets the header entries associated with key to the single
 // element value. It replaces any existing values associated with key.
 func (r *Request) SetHeader(key, value string) {
-	r.Header.Set(key, value)
+	r.HTTPRequest.Header.Set(key, value)
+}
+
+// SetToken -
+func (r *Request) SetToken(token string) {
+	r.HTTPRequest.Header.Set(HeaderAuthorization, AuthSchemeBearer+" "+token)
 }

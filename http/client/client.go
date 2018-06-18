@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -17,22 +18,62 @@ import (
 
 // A Client is an HTTP client.
 type Client struct {
-	*http.Client
+	HTTPClient *http.Client
+	Headers    map[string]string
 }
 
+// DefaultTransport -
+func DefaultTransport() http.RoundTripper {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+}
+
+// DefaultTimeout -
+const DefaultTimeout = 30 * time.Second
+
 // NewClient returns an HTTP client.
-func NewClient(client *http.Client) *Client {
-	if client != nil {
-		return &Client{client}
+func NewClient(transport http.RoundTripper, jar http.CookieJar, timeout time.Duration) (*Client, error) {
+	var client http.Client
+
+	if transport != nil {
+		client.Transport = transport
+	} else {
+		client.Transport = DefaultTransport()
 	}
 
-	return &Client{&http.Client{}}
+	if jar != nil {
+		client.Jar = jar
+	} else {
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			return nil, err
+		}
+		client.Jar = jar
+	}
+
+	if timeout > 0 {
+		client.Timeout = timeout
+	} else {
+		client.Timeout = DefaultTimeout
+	}
+
+	return &Client{HTTPClient: &client, Headers: make(map[string]string)}, nil
 }
 
 // NewClientWithProxy -
 func NewClientWithProxy(proxy string) (*Client, error) {
 	if proxy == "" {
-		return &Client{&http.Client{}}, nil
+		return NewClient(nil, nil, 0)
 	}
 
 	proxyURL, err := url.Parse(proxy)
@@ -40,7 +81,7 @@ func NewClientWithProxy(proxy string) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{&http.Client{Transport: &http.Transport{
+	transport := &http.Transport{
 		Proxy: http.ProxyURL(proxyURL),
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -51,12 +92,21 @@ func NewClientWithProxy(proxy string) (*Client, error) {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	}}}, nil
+	}
+
+	return NewClient(transport, nil, 0)
+}
+
+// SetToken -
+func (c *Client) SetToken(token string) {
+	c.Headers[HeaderAuthorization] = AuthSchemeBearer + " " + token
 }
 
 // Do sends an HTTP request and returns an HTTP response.
 func (c *Client) Do(req *Request) (*Response, error) {
-	resp, err := c.Client.Do(req.Request)
+	req.AddHeaders(c.Headers)
+
+	resp, err := c.HTTPClient.Do(req.HTTPRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -75,13 +125,13 @@ func (c *Client) Get(url string) (*Response, error) {
 }
 
 // GetFile sends a Get HTTP request and save the file.
-func (c *Client) GetFile(url, target string) (int64, error) {
+func (c *Client) GetFile(url, directory string) (int64, error) {
 	resp, err := c.Get(url)
 	if err != nil {
 		return 0, err
 	}
 
-	return saveFile(resp, target)
+	return resp.SaveAsFile(directory)
 }
 
 // Post sends a Post HTTP request and returns an HTTP response.
