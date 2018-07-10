@@ -52,12 +52,13 @@ func NewClient(id int64, addr, lookupdHTTPAddress string, config *Config) (*Clie
 		return nil, err
 	}
 
-	c := &Client{}
-	c.ID = id
-	c.LookupdHTTPAddress = lookupdHTTPAddress
-	c.Producer = producer
-	c.Topics = make(map[string]byte)
-	c.Subscribes = make(map[string]*nsq.Consumer)
+	c := &Client{
+		ID:                 id,
+		LookupdHTTPAddress: lookupdHTTPAddress,
+		Producer:           producer,
+		Topics:             make(map[string]byte),
+		Subscribes:         make(map[string]*nsq.Consumer),
+	}
 
 	return c, nil
 }
