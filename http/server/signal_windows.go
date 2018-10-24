@@ -1,9 +1,8 @@
 /*
  * Revision History:
- *     Initial: 2018/5/26        ShiChao
+ *     Initial: 2018/10/24        Li Zebang
  */
 
-// +build !windows
 package server
 
 import (
@@ -12,7 +11,7 @@ import (
 )
 
 func (ep *Entrypoint) configureSignals() {
-	signal.Notify(ep.signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
+	signal.Notify(ep.signals, syscall.SIGINT, syscall.SIGTERM)
 }
 
 func (ep *Entrypoint) listenSignals() {
@@ -20,7 +19,6 @@ func (ep *Entrypoint) listenSignals() {
 		sig := <-ep.signals
 
 		switch sig {
-		case syscall.SIGUSR1:
 		default:
 			ep.Stop()
 			return
