@@ -7,11 +7,16 @@ package server
 
 import (
 	"os/signal"
+	"runtime"
 	"syscall"
 )
 
 func (ep *Entrypoint) configureSignals() {
-	signal.Notify(ep.signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
+	if runtime.GOOS == "windows" {
+		signal.Notify(ep.signals, syscall.SIGINT, syscall.SIGTERM)
+	} else {
+		signal.Notify(ep.signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
+	}
 }
 
 func (ep *Entrypoint) listenSignals() {
