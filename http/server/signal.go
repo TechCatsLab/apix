@@ -1,9 +1,10 @@
+// +build !windows
+
 /*
  * Revision History:
  *     Initial: 2018/5/26        ShiChao
  */
 
-// +build !windows
 package server
 
 import (
